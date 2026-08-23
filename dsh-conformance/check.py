@@ -198,7 +198,7 @@ def _print_gaps(agg: dict) -> None:
     print(f"    superseded attempt      {ref.total(agg['gap_superseded']):>8,}   D-4")
     print(f"    compaction summarize    {ref.total(agg['gap_compaction']):>8,}   D-3")
     print()
-    print("  Reference: https://github.com/lizhuojunx86/traceguard/blob/main/CONFORMANCE-DSH.md")
+    print("  Reference: https://github.com/lizhuojunx86/token-accounting-conformance/blob/main/CONFORMANCE-DSH.md")
     print()
 
 

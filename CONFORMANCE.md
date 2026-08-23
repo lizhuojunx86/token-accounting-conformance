@@ -1,6 +1,6 @@
 # Claude Code transcript accounting — conformance invariants
 
-v0.1 · 2026-08-10 · maintained with the harnesses in [`usage-tracker-audit/`](usage-tracker-audit/)
+v0.1 · 2026-08-10 · maintained with the harnesses in this repository
 
 If your tool reads `~/.claude/projects` and reports tokens, cost, or usage
 totals, these are the invariants it has to hold. Every one of them is here
@@ -184,8 +184,7 @@ nonzero exit, a populated warnings list — not stdout), and countable.
 
 ## Running the checks
 
-The runnable harnesses live under
-[`usage-tracker-audit/`](usage-tracker-audit/): synthetic corpus with a
+The runnable harnesses live in this repository: synthetic corpus with a
 by-construction manifest, red/green exit code, about a minute, no real
 `~/.claude` data touched. Where a GUI was in the way, the harness stubs it
 and imports the vendor's own module — the numbers come out of their code, not
@@ -219,7 +218,7 @@ against: append-only, `message.id`-keyed, Apache-2.0. `pip install traceguard`.
 
 Where these invariants are now enforced by someone else's code, who
 reproduced a measurement independently, and what has been offered and not
-taken up: [`usage-tracker-audit/ADOPTERS.md`](usage-tracker-audit/ADOPTERS.md).
+taken up: [`ADOPTERS.md`](ADOPTERS.md).
 
 ## Contributing a counterexample
 

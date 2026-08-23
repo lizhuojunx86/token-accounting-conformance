@@ -9,13 +9,13 @@ second.
 
 ```bash
 git clone https://github.com/lizhuojunx86/traceguard
-cd traceguard/usage-tracker-audit/dsh-conformance
+cd conformance/dsh-conformance
 python3 check.py --self-test
 python3 check.py --cmd "node dist/dsh-total.js"
 ```
 
 The invariants themselves are in
-[`CONFORMANCE-DSH.md`](../../CONFORMANCE-DSH.md); this directory is the
+[`CONFORMANCE-DSH.md`](../CONFORMANCE-DSH.md); this directory is the
 runnable half. `workflow.yml` is a drop-in GitHub Action with one line to edit.
 
 ## The contract

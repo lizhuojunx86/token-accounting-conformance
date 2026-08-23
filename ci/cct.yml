@@ -19,13 +19,13 @@ jobs:
       - name: Fetch the harness
         uses: actions/checkout@v4
         with:
-          repository: lizhuojunx86/traceguard
-          path: traceguard
+          repository: lizhuojunx86/token-accounting-conformance
+          path: conformance
 
       - uses: actions/setup-node@v4
         with:
           node-version: 20
 
       - name: Run the dedup check against this commit
-        working-directory: traceguard/usage-tracker-audit/cct-dedup-check
+        working-directory: conformance/cct-dedup-check
         run: ./run_check.sh --commit "$GITHUB_SHA"

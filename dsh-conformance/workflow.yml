@@ -6,7 +6,7 @@
 # a committed synthetic fixture, so it needs no corpus, no DeepSeek account and
 # no secrets, and it finishes in seconds.
 #
-# Invariants: https://github.com/lizhuojunx86/traceguard/blob/main/CONFORMANCE-DSH.md
+# Invariants: https://github.com/lizhuojunx86/token-accounting-conformance/blob/main/CONFORMANCE-DSH.md
 
 name: dsh-conformance
 
@@ -28,11 +28,11 @@ jobs:
       - name: Fetch the conformance suite
         uses: actions/checkout@v4
         with:
-          repository: lizhuojunx86/traceguard
+          repository: lizhuojunx86/token-accounting-conformance
           path: .dsh-conformance
 
       - name: Check the suite against itself first
-        run: python3 .dsh-conformance/usage-tracker-audit/dsh-conformance/check.py --self-test
+        run: python3 .dsh-conformance/dsh-conformance/check.py --self-test
 
       # THE ONE LINE TO EDIT.
       #
@@ -45,5 +45,5 @@ jobs:
       # Track only some buckets? Add --buckets uncachedInputTokens,outputTokens
       - name: Check this project's fold
         run: |
-          python3 .dsh-conformance/usage-tracker-audit/dsh-conformance/check.py \
+          python3 .dsh-conformance/dsh-conformance/check.py \
             --cmd "node dist/dsh-total.js"

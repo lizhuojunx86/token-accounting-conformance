@@ -2,7 +2,7 @@
 
 Folds a DSH session corpus four ways and prints the deltas. The gaps between
 the folds are the findings; the invariants they establish live in
-[`CONFORMANCE-DSH.md`](../../CONFORMANCE-DSH.md).
+[`CONFORMANCE-DSH.md`](../CONFORMANCE-DSH.md).
 
 ```
 N  naive      every usage sighting summed
@@ -101,4 +101,4 @@ provider that populates `compaction/summary.usage` into the projection, or a
 failed attempt that reported real tokens before it died — file it with the
 numbers and the fold you used.
 
-Apache-2.0, with the rest of [traceguard](../../README.md).
+Apache-2.0, with the rest of [traceguard](../README.md).

@@ -18,9 +18,9 @@ jobs:
       - name: Fetch the harness
         uses: actions/checkout@v4
         with:
-          repository: lizhuojunx86/traceguard
-          path: traceguard
+          repository: lizhuojunx86/token-accounting-conformance
+          path: conformance
 
       - name: Run the dedup check against this commit
-        working-directory: traceguard/usage-tracker-audit/clawdmeter-dedup
+        working-directory: conformance/clawdmeter-dedup
         run: ./run_check.sh --commit "$GITHUB_SHA"

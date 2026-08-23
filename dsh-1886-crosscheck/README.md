@@ -86,4 +86,4 @@ transpiles each file against its own tree's expectations and reads the view
 through whichever shape is present, so it folds both. That it folds both is not
 evidence that `63688b0` would typecheck against current master. It would not.
 
-Invariants: [`CONFORMANCE-DSH.md`](../../CONFORMANCE-DSH.md).
+Invariants: [`CONFORMANCE-DSH.md`](../CONFORMANCE-DSH.md).

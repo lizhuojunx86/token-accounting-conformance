@@ -1,7 +1,7 @@
 # Who runs these invariants
 
-2026-08-23 · companion to [`CONFORMANCE.md`](../CONFORMANCE.md) (Claude Code, I-1..I-11)
-and [`CONFORMANCE-DSH.md`](../CONFORMANCE-DSH.md) (DeepSeek Harness, D-1..D-5)
+2026-08-23 · companion to [`CONFORMANCE.md`](CONFORMANCE.md) (Claude Code, I-1..I-11)
+and [`CONFORMANCE-DSH.md`](CONFORMANCE-DSH.md) (DeepSeek Harness, D-1..D-5)
 
 No one has said "I adopted your catalog." As far as I can tell nobody cites
 either file by name, and I'd rather open with that than let a page titled
@@ -96,7 +96,7 @@ Two ways, and neither involves agreeing with me.
 Hold one of the invariants in code — a test, a check, a workflow — and link
 it. Or produce a number that contradicts one, in which case the catalog entry
 is wrong and I'd rather find out from you than not. The harnesses under
-[`usage-tracker-audit/`](.) are stdlib-only and run in about a minute; the DSH
+[``](.) are stdlib-only and run in about a minute; the DSH
 one ships its own fixture, so it needs no corpus of yours.
 
 If a row above is wrong about your project, open an issue or a PR against

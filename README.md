@@ -5,9 +5,9 @@ transcripts. Two invariant catalogs, a set of runnable harnesses that check them
 against a tracker's own code, and a record of which upstream projects now hold
 which invariant.
 
-[![catalog: I-1..I-11](https://img.shields.io/badge/catalog-I--1..I--11-blue)](../CONFORMANCE.md)
-[![catalog: D-1..D-5](https://img.shields.io/badge/catalog-D--1..D--5-blue)](../CONFORMANCE-DSH.md)
-[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](../LICENSE)
+[![catalog: I-1..I-11](https://img.shields.io/badge/catalog-I--1..I--11-blue)](CONFORMANCE.md)
+[![catalog: D-1..D-5](https://img.shields.io/badge/catalog-D--1..D--5-blue)](CONFORMANCE-DSH.md)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 
 ## Why this exists
 
@@ -15,7 +15,7 @@ Token trackers disagree with each other, and not on edge cases. I wrote up a
 comparison of six of them
 ([EN](https://dev.to/lizhuojunx86/i-audited-six-token-usage-trackers-they-disagree-with-each-other-by-2x-to-8x-2b1h),
 [中文](https://zhuanlan.zhihu.com/p/2073158752958791824)); the individual defects
-behind that are what this directory measures, one at a time, against the code
+behind that are what this repository measures, one at a time, against the code
 that shipped them:
 
 - one assistant message counted once per content block — **2.36×** in one
@@ -44,8 +44,8 @@ source with no magnitude claimed. Each entry says which it is.
 
 | | scope | entries |
 |---|---|---|
-| [`CONFORMANCE.md`](../CONFORMANCE.md) | tools reading `~/.claude/projects` (Claude Code transcripts) | I-1 .. I-11 |
-| [`CONFORMANCE-DSH.md`](../CONFORMANCE-DSH.md) | tools reading DeepSeek Harness session logs | D-1 .. D-5, plus S-1 .. S-4 recorded as structurally satisfied |
+| [`CONFORMANCE.md`](CONFORMANCE.md) | tools reading `~/.claude/projects` (Claude Code transcripts) | I-1 .. I-11 |
+| [`CONFORMANCE-DSH.md`](CONFORMANCE-DSH.md) | tools reading DeepSeek Harness session logs | D-1 .. D-5, plus S-1 .. S-4 recorded as structurally satisfied |
 
 They are separate because the failure modes are. Claude Code writes one message
 as several records and rewrites transcripts in place; DSH is append-only with a
@@ -176,13 +176,27 @@ Everything here is measured on a small number of corpora, most of them mine.
 Each catalog entry states what its own measurement does not cover, and the
 percentages are corpus-specific in a way the absolute counts are not. Where a
 figure is read from source rather than folded from data, the entry says so.
-Several DSH measurements (D-1, D-2, D-5) live only in this repository and have
+Several DSH measurements (D-1, D-2, D-5) live only here and have
 no upstream issue carrying the table.
 
 No third party has yet pointed this suite at their own tracker. Every harness
 here was written after I had already measured the defect and reported it, so how
 often the suite catches something nobody was looking for is unknown. None of the
 `ci/` workflows is wired into a target repository today.
+
+## Where this came from
+
+This suite spent its first month inside
+[lizhuojunx86/traceguard](https://github.com/lizhuojunx86/traceguard), a Python
+SDK about look-ahead bias in LLM pipelines — a different subject with a
+different audience, whose README and PyPI package have nothing to do with token
+accounting. A tracker maintainer landing on `CONFORMANCE.md` there arrived with
+no context and no path in. It is its own repository now, with the history of
+every file carried over.
+
+The old paths still resolve. They are cited from upstream issue threads that
+cannot be edited, and GitHub does not redirect paths inside a repository, so
+each one is kept there as a stub pointing here.
 
 ## Contributing a counterexample
 

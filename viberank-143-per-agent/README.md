@@ -1,6 +1,6 @@
 # viberank #143 — a drift verdict applied to the tool it is evidence about
 
-Invariant [I-10](../../CONFORMANCE.md): *a verdict must not outrun its
+Invariant [I-10](../CONFORMANCE.md): *a verdict must not outrun its
 evidence.* viberank's corpus scan reads `~/.claude/projects`, so it is evidence
 about Claude and nothing else. Until
 [#143](https://github.com/sculptdotfun/viberank/pull/143) a mixed day was stored

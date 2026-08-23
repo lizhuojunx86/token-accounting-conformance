@@ -5,7 +5,7 @@ Two binaries, one corpus, isolated `HOME` per leg. Answers one question: does
 `output` and `cacheRead` by exactly the `compaction/summary` events' own usage,
 and nothing else?
 
-Invariant: [D-3](../../CONFORMANCE-DSH.md) — count what compaction costs.
+Invariant: [D-3](../CONFORMANCE-DSH.md) — count what compaction costs.
 Reported at [tokscale#1152](https://github.com/junhoyeo/tokscale/issues/1152).
 
 ## Why two binaries rather than one binary and an argument

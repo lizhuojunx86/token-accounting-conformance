@@ -44,6 +44,6 @@ inheriting attribution, which is a different path; a normal tool result still
 gets its char estimate added on top of the API-reported number.
 
 Reproduction harness (A/B builder + comparison, real transcripts required):
-https://github.com/lizhuojunx86/traceguard/tree/main/usage-tracker-audit/tokscale-input-estimate-check
+https://github.com/lizhuojunx86/token-accounting-conformance/tree/main/tokscale-input-estimate-check
 
 Happy to run the same A/B against a fix branch if that's useful.

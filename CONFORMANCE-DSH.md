@@ -1,7 +1,7 @@
 # DeepSeek Harness session accounting — conformance invariants
 
 v0.3.0 · 2026-08-19 · companion to [`CONFORMANCE.md`](CONFORMANCE.md) (Claude Code) ·
-harness in [`usage-tracker-audit/dsh-probe/`](usage-tracker-audit/dsh-probe/) ·
+harness in [`dsh-probe/`](dsh-probe/) ·
 D-3 and D-4 filed upstream as [deepseek-harness#1886](https://github.com/deepseek-ai/deepseek-harness/discussions/1886)
 
 If your plugin reads a DeepSeek Harness session log and reports tokens, cost,
@@ -247,7 +247,7 @@ was measured on: the inherited-seed term there is 261,562 tokens, so the narrow
 identity misses by more than it captures. Recorded rather than quietly edited,
 because the narrow form was published before it was checked.
 
-**Check.** `usage-tracker-audit/dsh-conformance/` runs it against a committed
+**Check.** `dsh-conformance/` runs it against a committed
 synthetic fixture. `check.py --self-test` asserts every fold and the identity
 above in under a second, stdlib only, no corpus and no vendor account.
 `check.py --cmd "<your fold>"` runs the same assertion against an
@@ -444,12 +444,12 @@ that the line citations above are anchored to `47f9438` and do not transfer to
 master, and the consequence upstream is that `63688b0` — the reference
 implementation three of us verified — no longer applies to the tree it would
 have to land on. Only `64ee978` is written against current master.
-Cross-checked in [`usage-tracker-audit/dsh-1886-crosscheck/`](usage-tracker-audit/dsh-1886-crosscheck/):
+Cross-checked in [`dsh-1886-crosscheck/`](dsh-1886-crosscheck/):
 the two agree bucket for bucket on D-3 and differ by exactly the D-4 term.
 
 The reproductions, the regression tests other people wrote, and what was
 offered and not taken up are listed in
-[`usage-tracker-audit/ADOPTERS.md`](usage-tracker-audit/ADOPTERS.md).
+[`ADOPTERS.md`](ADOPTERS.md).
 
 ## Contributing a counterexample
 

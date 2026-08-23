@@ -26,9 +26,9 @@ jobs:
       - name: Fetch the harness
         uses: actions/checkout@v4
         with:
-          repository: lizhuojunx86/traceguard
-          path: traceguard
+          repository: lizhuojunx86/token-accounting-conformance
+          path: conformance
 
       - name: Run the drift check against the built binary
-        working-directory: traceguard/usage-tracker-audit/tokscale-drift-check
+        working-directory: conformance/tokscale-drift-check
         run: ./run_check.sh --bin "$GITHUB_WORKSPACE/target/release/tokscale"

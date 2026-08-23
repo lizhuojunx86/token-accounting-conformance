@@ -468,7 +468,7 @@ def build_fixture(dest: Path) -> dict:
 
     Ground truth is constructed, not measured, so the folds can be asserted
     before the probe is pointed at a real corpus. This mirrors the discipline in
-    usage-tracker-audit/: validate the checker on synthetic data first.
+    the rest of this repository: validate the checker on synthetic data first.
     """
     def usage(i, o, cr=0, cw=0):
         return {"inputTokens": i, "outputTokens": o, "cacheReadTokens": cr, "cacheWriteTokens": cw}

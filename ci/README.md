@@ -1,7 +1,7 @@
 # Conformance checks as CI
 
 Drop-in GitHub Actions workflows that run a tracker's conformance harness
-(see [`CONFORMANCE.md`](../../CONFORMANCE.md)) against the tracker's own
+(see [`CONFORMANCE.md`](../CONFORMANCE.md)) against the tracker's own
 repository on every push. Each harness builds a synthetic corpus with a
 by-construction manifest, imports the tracker's own code, and exits 0/1 — so
 the workflow is nothing but checkout + one script.
