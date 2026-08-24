@@ -1,0 +1,32 @@
+{
+  "groupBy": "client,model",
+  "entries": [
+    {
+      "client": "dsh",
+      "mergedClients": null,
+      "model": "fixture-model",
+      "provider": "fixture-provider",
+      "input": 870,
+      "output": 101,
+      "cacheRead": 8700,
+      "cacheWrite": 16,
+      "reasoning": 0,
+      "messageCount": 6,
+      "cost": 0.0,
+      "performance": {
+        "msPer1KTokens": null,
+        "totalDurationMs": 0,
+        "timedTokens": 0,
+        "sampleCount": 0,
+        "tokenCoverage": 0.0
+      }
+    }
+  ],
+  "totalInput": 870,
+  "totalOutput": 101,
+  "totalCacheRead": 8700,
+  "totalCacheWrite": 16,
+  "totalMessages": 6,
+  "totalCost": 0.0,
+  "processingTimeMs": 4215
+}
