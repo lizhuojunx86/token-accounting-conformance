@@ -13,7 +13,7 @@ The first and last are traps for people writing plugins. The middle two are gaps
 
 I spend a lot of time reading agent transcripts and adding up tokens. Over the past few months that turned into ten upstream fixes across four usage trackers: splitrail (216 stars, three issues), tokscale (4.6k), Clawdmeter, viberank, plus an open PR against claude-code-templates (30k). The pattern was always the same. Claude Code rewrites session files in place on resume and compact, so anything recomputing totals from live files inherits the drift. Streaming leaves partial snapshots that get summed as if they were separate calls. Subagent transcripts sit one directory deeper than a flat glob reaches, and on one corpus 54% of messages never entered any total.
 
-Eleven of those lessons are written up as invariants in a catalog. DeepSeek released Harness on August 13, and the ecosystem produced roughly 2,500 plugin repositories in two days. A curated registry snapshot covering 457 of them listed 27 that count tokens. I wanted to know whether the same class of bug had been reproduced at scale.
+Eleven of those lessons are written up as invariants in a catalog. So when DeepSeek released Harness on August 13 and the ecosystem produced roughly 2,500 plugin repositories in two days, 27 of them counting tokens, I wanted to know whether the same class of bug had been reproduced at scale.
 
 It hadn't. That surprised me, and it is worth saying before the criticism.
 
@@ -49,7 +49,7 @@ A forked child's log contains a copy of the parent's completed prefix. The heade
 
 I expected this to be a subagent problem. I was wrong, and being wrong is the interesting part.
 
-A subagent child is stamped `origin: 'subagent'` and its delegation depth increments. But `ctx.sessions.fork()` is an ordinary user-facing action available on any session, and the child it produces has `parentSession` and `seedLength` set, `delegationDepth: 0`, and no `origin` key at all. Here is the header I actually got, from an ordinary fork that showed up in the course of using the web UI. I wasn't trying to make one:
+A subagent child is stamped `origin: 'subagent'` and its delegation depth increments. But `ctx.sessions.fork()` is an ordinary user-facing action available on any session, and the child it produces has `parentSession` and `seedLength` set, `delegationDepth: 0`, and no `origin` key at all. Here is the header I actually got, from an ordinary fork I triggered by retrying a failed message:
 
 ```json
 {"type":"session","version":0,"id":"session-e61d64ec-…",
@@ -79,6 +79,8 @@ Whether spending 44,444 tokens to shed 19,962 is a good trade depends entirely o
 
 The `usage?` field is optional, so a provider reporting nothing on the summarize call produces no gap. That is a condition on the finding, not an escape from it. Both of my providers populated it.
 
+This one and the retry gap below are the two that live in DSH's own code, so I filed them upstream before writing this: [deepseek-harness#1886](https://github.com/deepseek-ai/deepseek-harness/discussions/1886). Whatever the maintainers say there is a better guide to what happens next than anything I can add here.
+
 ## A retried step is not one request
 
 The last one I found by accident, chasing why one step had three usage samples instead of two.
@@ -102,6 +104,8 @@ It also means my 2.000000× survived that group by luck rather than structure. T
 There is a second consequence I can describe but not measure. The official fold *replaces* on a repeated `(turn, step)` rather than adding, and it never sees `llm/retry`. So a failed attempt that reported real tokens before dying would have its cost silently dropped. Every failed attempt in my corpus reported zeros, so I have no number for this and I'm not going to invent one. The discriminator is sitting right there in the log if you want to handle it: `llm/retry` carries a `retryId` between the attempts.
 
 ## What I am not claiming
+
+Everything here was measured against `deepseek-ai/deepseek-harness` at commit `47f9438`, v0.1.0-rc.6. As of `99f6f02` (v0.1.0-rc.7, 17 August) `usage-projection.ts` is byte-identical to the version I measured, so both gaps survive that release. The project says in its own README that compatibility-breaking changes are coming, so check the current source before you act on any of it. If you are reading this well after it was posted, the upstream thread linked above is the better guide to what still holds.
 
 Four sessions, 8,650 events, 78 usage samples, two providers. The 2.000000× ratio is exact and does not need a large sample to mean what it says, and it reproduced independently on both routes. The fork trap has two observations, the compaction gap three, the retry one.
 
@@ -136,6 +140,6 @@ If you maintain a DSH plugin that counts tokens: fold per `(turn, step)`, filter
 
 And if your corpus contradicts any of this, I want the numbers. A step whose two usage samples disagree, a `seedLength` that doesn't bound the inherited prefix, a provider that populates the summary usage into the projection, or a failed attempt that reported real tokens before it died. The Claude Code catalog was built entirely out of people sending me counterexamples, and six of its entries exist because someone did.
 
-Probe, protocol, and the full invariant catalog are in the repository. Happy to answer questions about any of it.
+Probe, protocol, and the full invariant catalog are in the repository, and the upstream report is [deepseek-harness#1886](https://github.com/deepseek-ai/deepseek-harness/discussions/1886). Happy to answer questions about any of it.
 
 *— Li Zhuojun*
