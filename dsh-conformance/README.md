@@ -8,8 +8,8 @@ No corpus. No DeepSeek account. No secrets. Stdlib Python, runs in about a
 second.
 
 ```bash
-git clone https://github.com/lizhuojunx86/traceguard
-cd conformance/dsh-conformance
+git clone https://github.com/lizhuojunx86/token-accounting-conformance
+cd token-accounting-conformance/dsh-conformance
 python3 check.py --self-test
 python3 check.py --cmd "node dist/dsh-total.js"
 ```
@@ -129,7 +129,7 @@ file and keep the fixture.
 ## Scope
 
 The folds are transcribed from `deepseek-ai/deepseek-harness` at `47f9438`
-(v0.1.0-rc.6). The fixture is synthetic, so it says nothing about how often
+(v0.1.0-rc.5). The fixture is synthetic, so it says nothing about how often
 these hazards occur in real logs; for that, see the measured figures and the
 **Limits** section in `CONFORMANCE-DSH.md`. What it does say is that a fold
 which mishandles any one of them will be caught, which is the part a CI job

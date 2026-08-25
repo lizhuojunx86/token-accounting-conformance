@@ -22,7 +22,7 @@ mechanism's tokens to the first.)
 
 Corpus: 4 sessions, 8,650 events, 78 usage samples, MiniMax-M3 over
 `minimax-cn` and `qwen2.5:14b` over a local OpenAI-completions endpoint.
-Measured against `deepseek-ai/deepseek-harness` at `47f9438` (v0.1.0-rc.6).
+Measured against `deepseek-ai/deepseek-harness` at `47f9438` (v0.1.0-rc.5).
 
 ## Run it
 
