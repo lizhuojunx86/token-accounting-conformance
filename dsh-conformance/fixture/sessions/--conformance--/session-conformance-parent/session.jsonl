@@ -1,4 +1,4 @@
-{"createdAt": 1770000000000, "cwd": "/conformance", "delegationDepth": 0, "id": "conformance-parent", "type": "session", "version": 0}
+{"createdAt": 1770000000000, "cwd": "/conformance", "delegationDepth": 0, "id": "session-conformance-parent", "type": "session", "version": 0}
 {"data": {"turn": 0}, "seq": 0, "time": 1770000000000, "type": "user/message"}
 {"data": {"chunk": {"type": "usage", "usage": {"cacheReadTokens": 1000, "cacheWriteTokens": 5, "inputTokens": 100, "outputTokens": 10}}, "step": 0, "turn": 0}, "seq": 1, "time": 1770000000001, "type": "assistant/chunk"}
 {"data": {"message": {}, "step": 0, "turn": 0, "usage": {"cacheReadTokens": 1000, "cacheWriteTokens": 5, "inputTokens": 100, "outputTokens": 10}}, "seq": 2, "time": 1770000000002, "type": "assistant/message"}

@@ -143,14 +143,14 @@ def main() -> int:
 
     write_session(
         "session-conformance-parent",
-        {"type": "session", "version": 0, "id": "conformance-parent", "cwd": "/conformance",
+        {"type": "session", "version": 0, "id": "session-conformance-parent", "cwd": "/conformance",
          "createdAt": BASE_TIME, "delegationDepth": 0},
         parent,
     )
     write_session(
         "session-conformance-child",
-        {"type": "session", "version": 0, "id": "conformance-child", "cwd": "/conformance",
-         "createdAt": BASE_TIME + 100, "parentSession": "conformance-parent",
+        {"type": "session", "version": 0, "id": "session-conformance-child", "cwd": "/conformance",
+         "createdAt": BASE_TIME + 100, "parentSession": "session-conformance-parent",
          "seedLength": 11, "origin": "subagent", "delegationDepth": 1},
         child,
     )
