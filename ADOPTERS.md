@@ -1,6 +1,6 @@
 # Who runs these invariants
 
-2026-08-23 · companion to [`CONFORMANCE.md`](CONFORMANCE.md) (Claude Code, I-1..I-11)
+2026-08-25 · companion to [`CONFORMANCE.md`](CONFORMANCE.md) (Claude Code, I-1..I-11)
 and [`CONFORMANCE-DSH.md`](CONFORMANCE-DSH.md) (DeepSeek Harness, D-1..D-5)
 
 No one has said "I adopted your catalog." As far as I can tell nobody cites
@@ -70,14 +70,42 @@ checkable.
 | a137460387 | a fourth implementation of D-3, as one commit on top of master, with unit coverage and a matching Web fixture. Confirms the gap is still live on `b150a551b8` (`dsh-v0.1.1-rc.2`) and deliberately leaves D-4 alone, for the same reason yha9806 did: the attempt-boundary rule is the structural decision still open. Then folded `le-soleil-se-couche`'s fixture through it — the first numbers any of the four implementations had produced on that substrate — and **closed a gap I had been carrying since the opening post**: his compaction increment is +31 / +9 / +37 / **+6**, a summary reporting cache-write traffic, folded correctly. `cacheWriteTokens` on the compaction path is unobserved in the wild, but it is no longer untested | [deepseek-harness#1886](https://github.com/deepseek-ai/deepseek-harness/discussions/1886) |
 | pinion05 | measured DSH model attribution on a live `~/.dsh` tree — 1,231 of 1,762 rows served by a model other than the configured one. Self-closed, but it is the second person reading `sessions/dsh.rs` for accounting | [tokscale#1163](https://github.com/junhoyeo/tokscale/pull/1163) |
 
-## 4 · Offered and not taken up
+## 4 · Conformance records
+
+Somebody pointed `dsh-conformance/` at their own fold and posted what it said.
+Distinct from §3: a reproduction agrees with a number of mine, a record is the
+checker's verdict on code I have never seen.
+
+| who | fold | verdict | where |
+|---|---|---|---|
+| le-soleil-se-couche | local `dsh-token-cost`, through a read-only adapter over the committed fixture. Node 22.22.1, Python 3.14.6, checker pinned at `0667479` | PASS on all four buckets, 1,050 / 105 / 10,500 / 13, covering D-1..D-4, plus the self-test | [deepseek-harness#1886](https://github.com/deepseek-ai/deepseek-harness/discussions/1886#discussioncomment-18141954) |
+
+One run, and it found a defect in the fixture on the first try: the session
+directories were `session-conformance-{parent,child}` while the headers carried
+`id: conformance-{parent,child}`. Real DSH cannot produce that, because the
+transcript lives at `<DSH_HOME>/sessions/<encoded-cwd>/<session-id>/` and the
+directory name is the session id. A fold taking the directory name as the id,
+which is what the vendor parser does when the header is missing, failed on a
+hazard that does not exist in the wild. `reference.py` reads `header["id"]` and
+never touches the path, so the suite was structurally unable to catch this
+itself. Fixed in `e211154`; every bucket and gap term unchanged, and
+`expected.json` byte-identical.
+
+He scoped the record himself, and it is worth carrying over rather than
+paraphrasing: it covers the fold semantics, not a shipped CLI, and it settles
+nothing about who owns the attempt-boundary decision upstream.
+
+---
+
+## 5 · Offered and not taken up
 
 Kept here so the page isn't only wins.
 
 - **`ci/tokscale.yml`** — the drift harness as a drop-in workflow, offered at
   [tokscale#1011](https://github.com/junhoyeo/tokscale/issues/1011) and
   [Clawdmeter#21](https://github.com/weltern/Clawdmeter/issues/21). Not wired
-  into any repo yet.
+  into any repo yet. The DSH checker has now been run by someone else
+  (§4), but no project runs any of this in its own CI.
 - **I-1 in claude-code-templates** —
   [#754](https://github.com/davila7/claude-code-templates/pull/754), open,
   checks green, no maintainer response. The last unshipped fix.

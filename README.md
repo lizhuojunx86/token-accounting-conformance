@@ -159,9 +159,10 @@ else's code, the regression tests other people wrote, and who reproduced a
 measurement independently. It opens by saying that nobody cites either catalog
 by name, which is true and is the honest place to start.
 
-As of 2026-08-23 it lists eleven upstream fixes across four projects
+As of 2026-08-25 it lists eleven upstream fixes across four projects
 (Clawdmeter, splitrail, tokscale, viberank), three regression tests written by
-other people, and seven independent reproductions. The count of fixes depends on
+other people, seven independent reproductions, and one conformance record: the
+first fold run through `dsh-conformance/` by somebody other than me. The count of fixes depends on
 how you split one Clawdmeter change that closed two invariants at once —
 `CONFORMANCE.md` counts it as one and says ten. Read the table rather than
 either total.
@@ -179,10 +180,13 @@ figure is read from source rather than folded from data, the entry says so.
 Several DSH measurements (D-1, D-2, D-5) live only here and have
 no upstream issue carrying the table.
 
-No third party has yet pointed this suite at their own tracker. Every harness
-here was written after I had already measured the defect and reported it, so how
-often the suite catches something nobody was looking for is unknown. None of the
-`ci/` workflows is wired into a target repository today.
+One fold outside mine has been run through `dsh-conformance/`, by
+le-soleil-se-couche on 2026-08-25. It passed, and it found a defect in the
+fixture on the first attempt. Everything else here has only ever been run by me,
+and every harness was written after I had already measured the defect and
+reported it, so how often the suite catches something nobody was looking for is
+still unknown. None of the `ci/` workflows is wired into a target repository
+today.
 
 ## Where this came from
 
