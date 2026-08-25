@@ -67,7 +67,7 @@ checkable.
 | le-soleil-se-couche | a fully synthetic fixture covering D-1..D-4, fork seed and cache-write traffic — no private logs needed. Also produced the counterexample that **corrected me**: generalising the attempt boundary to any `failure` field would double-count, because AgentLoop still allowlists `error \| aborted` | same thread |
 | aron-intframe | reported a viberank double-count in the same shape, self-measured: a public $150.5K / 108.9B against a real $91.3K / 70.8B. Maintainer verified and repaired it | [viberank#127](https://github.com/sculptdotfun/viberank/issues/127) |
 | NickAme03 | filed the splitrail I-4 case ([#220](https://github.com/Piebald-AI/splitrail/issues/220)) whose ratios I'd predicted and then verified, wrote the fix himself, and has since carried the same class elsewhere — "Streaming rows are not duplicates: keeping the first one undercounts" | [ccseva#38](https://github.com/Iamshankhadeep/ccseva/issues/38) |
-| a137460387 | a fourth implementation of D-3, as one commit on top of master, with unit coverage and a matching Web fixture. Confirms the gap is still live on `b150a551b8` (`dsh-v0.1.1-rc.2`) and deliberately leaves D-4 alone, for the same reason yha9806 did: the attempt-boundary rule is the structural decision still open | [deepseek-harness#1886](https://github.com/deepseek-ai/deepseek-harness/discussions/1886) |
+| a137460387 | a fourth implementation of D-3, as one commit on top of master, with unit coverage and a matching Web fixture. Confirms the gap is still live on `b150a551b8` (`dsh-v0.1.1-rc.2`) and deliberately leaves D-4 alone, for the same reason yha9806 did: the attempt-boundary rule is the structural decision still open. Then folded `le-soleil-se-couche`'s fixture through it — the first numbers any of the four implementations had produced on that substrate — and **closed a gap I had been carrying since the opening post**: his compaction increment is +31 / +9 / +37 / **+6**, a summary reporting cache-write traffic, folded correctly. `cacheWriteTokens` on the compaction path is unobserved in the wild, but it is no longer untested | [deepseek-harness#1886](https://github.com/deepseek-ai/deepseek-harness/discussions/1886) |
 | pinion05 | measured DSH model attribution on a live `~/.dsh` tree — 1,231 of 1,762 rows served by a model other than the configured one. Self-closed, but it is the second person reading `sessions/dsh.rs` for accounting | [tokscale#1163](https://github.com/junhoyeo/tokscale/pull/1163) |
 
 ## 4 · Offered and not taken up
@@ -85,7 +85,12 @@ Kept here so the page isn't only wins.
   `compaction/summary` branch, does not read `llm/retry`, and reports
   `stateVersion: 1`. Checked 2026-08-23 against `b150a551b8`, tagged
   `dsh-v0.1.1-rc.2`. External PRs are closed by CONTRIBUTING, so none of the
-  four independent implementations below can move on its own.
+  four independent implementations in §3 can move on its own. Worse, they are
+  now decaying: `ProjectionDefinition` changed shape in `4c421ec88` and
+  `9127d7e8b`, so `63688b0` — the one three of us verified — no longer applies
+  to the tree it would have to land on. Only `64ee978` is written against
+  current master. A fix nobody rules on does not keep; it goes stale against
+  the API it was written for.
 
 ---
 
@@ -95,9 +100,9 @@ Two ways, and neither involves agreeing with me.
 
 Hold one of the invariants in code — a test, a check, a workflow — and link
 it. Or produce a number that contradicts one, in which case the catalog entry
-is wrong and I'd rather find out from you than not. The harnesses under
-[``](.) are stdlib-only and run in about a minute; the DSH
-one ships its own fixture, so it needs no corpus of yours.
+is wrong and I'd rather find out from you than not. The harnesses here are
+stdlib-only and run in about a minute; the DSH one ships its own fixture, so it
+needs no corpus of yours.
 
 If a row above is wrong about your project, open an issue or a PR against
 this file.
