@@ -35,6 +35,28 @@ before the result is fine. Track only two buckets? Pass
 
 Exit status is 0 when every checked bucket matches.
 
+### Your command's working directory is your own
+
+`check.py` does not change directories. It appends the fixture root to your
+argv and sets `DSH_CONFORMANCE_ROOT`, and that is the whole of it. Where your
+command runs is wherever you launched it from.
+
+This caught the first outside run. A fold that imports the harness's own
+`tokenUsageProjectionDefinition` out of a checkout needs its cwd inside that
+checkout, or the TypeScript loader resolves workspace paths against the wrong
+root and falls back to unbuilt `lib/` entries. It fails before folding anything,
+so what you get is a module resolution error, which looks nothing like a
+conformance failure and sends you looking in the wrong place.
+
+If your command depends on a checkout, `cd` into it yourself:
+
+```bash
+python3 check.py --cmd "cd /path/to/checkout && node dist/dsh-total.js"
+```
+
+Reported by a137460387 while checking a compaction-only patch against this
+fixture on a Windows Git Bash setup, Node v24.16.0.
+
 ## What the fixture contains, and why
 
 Two sessions, a parent and a fork of it, hand-built so every hazard shows up
