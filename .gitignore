@@ -2,6 +2,9 @@
 # session transcripts. Only the reproducible harness belongs in the repo.
 # Mirrors splitrail-validation/.gitignore.
 work/
+.work/
+node_modules/
+package-lock.json
 out/
 *.log
 

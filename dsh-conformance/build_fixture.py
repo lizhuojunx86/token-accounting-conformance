@@ -69,8 +69,15 @@ def parent_events() -> list:
                                   "chunk": {"type": "finish",
                                             "reason": {"kind": "error",
                                                        "failure": {"code": "TRANSPORT"}}}}),
-        ev(5, "llm/retry", {"retryId": "r-conformance-1", "provider": "conformance"}),
-        ev(6, "llm/retry-started", {"retryId": "r-conformance-1", "retry": 1}),
+        # Both retry markers carry the attempt they belong to. llm-retry writes
+        # them that way (append('llm/retry-started', { retryId, turn, step, retry }))
+        # and its own invariant rejects a started event whose turn/step does not
+        # match the scheduled attempt, so a log without them is a shape the wild
+        # never produces.
+        ev(5, "llm/retry", {"retryId": "r-conformance-1", "provider": "conformance",
+                            "turn": 0, "step": 1}),
+        ev(6, "llm/retry-started", {"retryId": "r-conformance-1", "retry": 1,
+                                    "turn": 0, "step": 1}),
         # attempt two, under the SAME (turn, step), then its dedup partner
         ev(7, "assistant/chunk", {"turn": 0, "step": 1,
                                   "chunk": {"type": "usage", "usage": U_RETRY}}),
