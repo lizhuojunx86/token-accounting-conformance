@@ -1,6 +1,6 @@
 # Who runs these invariants
 
-2026-08-25 · companion to [`CONFORMANCE.md`](CONFORMANCE.md) (Claude Code, I-1..I-11)
+2026-08-28 · companion to [`CONFORMANCE.md`](CONFORMANCE.md) (Claude Code, I-1..I-11)
 and [`CONFORMANCE-DSH.md`](CONFORMANCE-DSH.md) (DeepSeek Harness, D-1..D-5)
 
 No one has said "I adopted your catalog." As far as I can tell nobody cites
@@ -69,6 +69,7 @@ checkable.
 | NickAme03 | filed the splitrail I-4 case ([#220](https://github.com/Piebald-AI/splitrail/issues/220)) whose ratios I'd predicted and then verified, wrote the fix himself, and has since carried the same class elsewhere — "Streaming rows are not duplicates: keeping the first one undercounts" | [ccseva#38](https://github.com/Iamshankhadeep/ccseva/issues/38) |
 | a137460387 | a fourth implementation of D-3, as one commit on top of master, with unit coverage and a matching Web fixture. Confirms the gap is still live on `b150a551b8` (`dsh-v0.1.1-rc.2`) and deliberately leaves D-4 alone, for the same reason yha9806 did: the attempt-boundary rule is the structural decision still open. Then folded `le-soleil-se-couche`'s fixture through it — the first numbers any of the four implementations had produced on that substrate — and **closed a gap I had been carrying since the opening post**: his compaction increment is +31 / +9 / +37 / **+6**, a summary reporting cache-write traffic, folded correctly. `cacheWriteTokens` on the compaction path is unobserved in the wild, but it is no longer untested | [deepseek-harness#1886](https://github.com/deepseek-ai/deepseek-harness/discussions/1886) |
 | pinion05 | measured DSH model attribution on a live `~/.dsh` tree — 1,231 of 1,762 rows served by a model other than the configured one. Self-closed, but it is the second person reading `sessions/dsh.rs` for accounting | [tokscale#1163](https://github.com/junhoyeo/tokscale/pull/1163) |
+| vpimshin | a fifth implementation (`fix/token-usage-compaction-and-retry`, `b4bbea2` + `e28f179`), the second written against current master and the first to change the logging side rather than only the fold: `compaction/end` gains `usage`/`provider`/`model`, so a failed or later-rejected summarize call's spend reaches the log at all. Covers the retry boundary too — upstream landed that half independently three and a half hours after his post, keyed differently, which is where the two incompatible `stateVersion: 2`s below come from. 480 tests self-reported; on my corpus all three `compaction/end` events carry neither error nor usage, so the schema half is fixture-only for now | [deepseek-harness#1886](https://github.com/deepseek-ai/deepseek-harness/discussions/1886#discussioncomment-18176363) |
 
 ## 4 · Conformance records
 
@@ -79,6 +80,7 @@ checker's verdict on code I have never seen.
 | who | fold | verdict | where |
 |---|---|---|---|
 | le-soleil-se-couche | local `dsh-token-cost`, through a read-only adapter over the committed fixture. Node 22.22.1, Python 3.14.6, checker pinned at `0667479` | PASS on all four buckets, 1,050 / 105 / 10,500 / 13, covering D-1..D-4, plus the self-test | [deepseek-harness#1886](https://github.com/deepseek-ai/deepseek-harness/discussions/1886#discussioncomment-18141954) |
+| a137460387 | the branch's own patched projection (`upstream-pr/token-meter-compaction-usage`, tip `64ee978`), folded per event through `init`/`apply`. Node v24.16.0, Windows Git Bash, Python 3.10, checker at `d1c44e5` | FAIL, as the branch's declared scope predicts: reported = the official fold plus the full compaction increment, and the residual 200 / 20 / 2,000 / 12 is `gap_inherited − gap_superseded` with no compaction term | [deepseek-harness#1886](https://github.com/deepseek-ai/deepseek-harness/discussions/1886#discussioncomment-18151717) |
 
 One run, and it found a defect in the fixture on the first try: the session
 directories were `session-conformance-{parent,child}` while the headers carried
@@ -95,6 +97,8 @@ He scoped the record himself, and it is worth carrying over rather than
 paraphrasing: it covers the fold semantics, not a shipped CLI, and it settles
 nothing about who owns the attempt-boundary decision upstream.
 
+The second run is the first FAIL, and the first from Windows. It is the verdict working as designed: the residual decomposes into exactly the two dimensions the branch deliberately leaves out, and it read the same from outside the checkout as it had from inside it. His one wiring note (the fold command must run with its cwd inside the branch checkout, or the TS loader falls back to an unbuilt `lib/`) is in the README now (`f74b4a4`).
+
 ---
 
 ## 5 · Offered and not taken up
@@ -109,16 +113,18 @@ Kept here so the page isn't only wins.
 - **I-1 in claude-code-templates** —
   [#754](https://github.com/davila7/claude-code-templates/pull/754), open,
   checks green, no maintainer response. The last unshipped fix.
-- **D-1..D-5 upstream** — deepseek-harness master still has no
-  `compaction/summary` branch, does not read `llm/retry`, and reports
-  `stateVersion: 1`. Checked 2026-08-23 against `b150a551b8`, tagged
-  `dsh-v0.1.1-rc.2`. External PRs are closed by CONTRIBUTING, so none of the
-  four independent implementations in §3 can move on its own. Worse, they are
-  now decaying: `ProjectionDefinition` changed shape in `4c421ec88` and
-  `9127d7e8b`, so `63688b0` — the one three of us verified — no longer applies
-  to the tree it would have to land on. Only `64ee978` is written against
-  current master. A fix nobody rules on does not keep; it goes stale against
-  the API it was written for.
+- **D-1..D-5 upstream** — half moved, at last. `dsh-v0.1.2-alpha.1` (`cd5ef814`,
+  2026-08-27) lands the retry half: `apply()` clears the replacement slot on
+  `llm/retry-started` and `tokenUsage.stateVersion` goes 1 → 2. The compaction
+  half is still missing (`usageOf()` has no `compaction/summary` branch at
+  `cd5ef814`), and external PRs are still closed by CONTRIBUTING. The decay this
+  section warned about happened twice over: `63688b0` already no longer applied
+  after `4c421ec88`/`9127d7e8b`, and now there are two incompatible
+  `stateVersion: 2`s in the wild — upstream keys the attempt boundary on
+  `llm/retry-started`, vpimshin's branch on failure kind — so anything trusting
+  that number to identify a persisted projection can be wrong while looking
+  right. A fix nobody rules on does not keep; it goes stale against the API it
+  was written for, and then the version number stops meaning one thing.
 
 ---
 
