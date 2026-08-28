@@ -69,7 +69,7 @@ checkable.
 | NickAme03 | filed the splitrail I-4 case ([#220](https://github.com/Piebald-AI/splitrail/issues/220)) whose ratios I'd predicted and then verified, wrote the fix himself, and has since carried the same class elsewhere — "Streaming rows are not duplicates: keeping the first one undercounts" | [ccseva#38](https://github.com/Iamshankhadeep/ccseva/issues/38) |
 | a137460387 | a fourth implementation of D-3, as one commit on top of master, with unit coverage and a matching Web fixture. Confirms the gap is still live on `b150a551b8` (`dsh-v0.1.1-rc.2`) and deliberately leaves D-4 alone, for the same reason yha9806 did: the attempt-boundary rule is the structural decision still open. Then folded `le-soleil-se-couche`'s fixture through it — the first numbers any of the four implementations had produced on that substrate — and **closed a gap I had been carrying since the opening post**: his compaction increment is +31 / +9 / +37 / **+6**, a summary reporting cache-write traffic, folded correctly. `cacheWriteTokens` on the compaction path is unobserved in the wild, but it is no longer untested | [deepseek-harness#1886](https://github.com/deepseek-ai/deepseek-harness/discussions/1886) |
 | pinion05 | measured DSH model attribution on a live `~/.dsh` tree — 1,231 of 1,762 rows served by a model other than the configured one. Self-closed, but it is the second person reading `sessions/dsh.rs` for accounting | [tokscale#1163](https://github.com/junhoyeo/tokscale/pull/1163) |
-| vpimshin | a fifth implementation (`fix/token-usage-compaction-and-retry`, `b4bbea2` + `e28f179`), the second written against current master and the first to change the logging side rather than only the fold: `compaction/end` gains `usage`/`provider`/`model`, so a failed or later-rejected summarize call's spend reaches the log at all. Covers the retry boundary too — upstream landed that half independently three and a half hours after his post, keyed differently, which is where the two incompatible `stateVersion: 2`s below come from. 480 tests self-reported; on my corpus all three `compaction/end` events carry neither error nor usage, so the schema half is fixture-only for now | [deepseek-harness#1886](https://github.com/deepseek-ai/deepseek-harness/discussions/1886#discussioncomment-18176363) |
+| vpimshin | a fifth implementation (`fix/token-usage-compaction-and-retry`, `b4bbea2` + `e28f179`), the second written against current master and the first to change the logging side rather than only the fold: `compaction/end` gains `usage`/`provider`/`model`, so a failed or later-rejected summarize call's spend reaches the log at all. Covers the retry boundary too — but upstream had already landed that half two days *before* his post (`b565df344`, on the default branch 2026-08-25T11:09Z), keyed differently, which is where the two incompatible `stateVersion: 2`s below come from. Neither of us noticed: he measured against `b150a551b8` and I kept re-checking the same tag, and rc.2 is not a descendant of the fix. 480 tests self-reported; on my corpus all three `compaction/end` events carry neither error nor usage, so the schema half is fixture-only for now | [deepseek-harness#1886](https://github.com/deepseek-ai/deepseek-harness/discussions/1886#discussioncomment-18176363) |
 
 ## 4 · Conformance records
 
@@ -97,6 +97,21 @@ He scoped the record himself, and it is worth carrying over rather than
 paraphrasing: it covers the fold semantics, not a shipped CLI, and it settles
 nothing about who owns the attempt-boundary decision upstream.
 
+A second defect of the same class surfaced on 2026-08-28, this time with
+nobody running anything: the fixture's `llm/retry` and `llm/retry-started`
+markers carried no `turn`/`step`. `llm-retry` writes both with the attempt
+they belong to (`append('llm/retry-started', { retryId, turn, step, retry })`,
+`packages/llm/llm-retry/src/index.ts:152`) and its own invariant rejects a
+started event whose turn/step does not match its scheduled attempt, so again
+the fixture described a shape the wild never produces. It went unnoticed
+because no fold read those events — until upstream's `b565df344` keyed the
+attempt boundary on exactly them. Against the old fixture that fold scored
+850 / 85 / 8,500 / 25, byte for byte the *unpatched* rc.2 result: the checker
+would have reported an implementation that does fix D-4 as fixing none of it.
+Both defects are the same failure mode, and `reference.py` was insulated from
+both — it consumes no `llm/*` event either. Fixed in `e955166`; `expected.json`
+byte-identical again, every fold and gap term unchanged.
+
 The second run is the first FAIL, and the first from Windows. It is the verdict working as designed: the residual decomposes into exactly the two dimensions the branch deliberately leaves out, and it read the same from outside the checkout as it had from inside it. His one wiring note (the fold command must run with its cwd inside the branch checkout, or the TS loader falls back to an unbuilt `lib/`) is in the README now (`f74b4a4`).
 
 ---
@@ -113,8 +128,8 @@ Kept here so the page isn't only wins.
 - **I-1 in claude-code-templates** —
   [#754](https://github.com/davila7/claude-code-templates/pull/754), open,
   checks green, no maintainer response. The last unshipped fix.
-- **D-1..D-5 upstream** — half moved, at last. `dsh-v0.1.2-alpha.1` (`cd5ef814`,
-  2026-08-27) lands the retry half: `apply()` clears the replacement slot on
+- **D-1..D-5 upstream** — half moved, at last. `b565df344` (2026-08-25,
+  released in `dsh-v0.1.2-alpha.1` / `cd5ef814`) lands the retry half: `apply()` clears the replacement slot on
   `llm/retry-started` and `tokenUsage.stateVersion` goes 1 → 2. The compaction
   half is still missing (`usageOf()` has no `compaction/summary` branch at
   `cd5ef814`), and external PRs are still closed by CONTRIBUTING. The decay this

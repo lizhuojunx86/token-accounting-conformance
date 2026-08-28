@@ -3,7 +3,8 @@
 v0.4.0 · 2026-08-28 · companion to [`CONFORMANCE.md`](CONFORMANCE.md) (Claude Code) ·
 harness in [`dsh-probe/`](dsh-probe/) ·
 D-3 and D-4 filed upstream as [deepseek-harness#1886](https://github.com/deepseek-ai/deepseek-harness/discussions/1886)
-— **D-4 fixed upstream in `dsh-v0.1.2-alpha.1` (2026-08-27); D-3 open**
+— **D-4 fixed upstream in `b565df344` (2026-08-25), released in
+`dsh-v0.1.2-alpha.1`; D-3 open**
 
 If your plugin reads a DeepSeek Harness session log and reports tokens, cost,
 or usage totals, these are the invariants it has to hold.
@@ -173,8 +174,10 @@ have to guess from adjacency.
 
 ## D-4 · A retried step carries more than two samples — never keep-first
 
-> **Fixed upstream 2026-08-27.** Present at `47f9438` (v0.1.0-rc.5) through
-> `b150a551b8` (0.1.1-rc.2); fixed in `cd5ef814` (`dsh-v0.1.2-alpha.1`), which
+> **Fixed upstream 2026-08-25** in `b565df344`, first released in
+> `dsh-v0.1.2-alpha.1` (`cd5ef814`, 2026-08-28). Present at `47f9438`
+> (v0.1.0-rc.5) through `b150a551b8` (0.1.1-rc.2), neither of which is a
+> descendant of the fix. It
 > bumped `tokenUsage.stateVersion` 1→2 and made `llm/retry-started` close the
 > `(turn, step)` replacement slot so a retried attempt adds instead of
 > replacing. The entry stays: logs written before that tag still carry the
@@ -445,10 +448,14 @@ against `cd5ef814` (`dsh-v0.1.2-alpha.1`, published 2026-08-27): `usageOf()`
 still matches only `assistant/chunk` and `assistant/message`, and
 `compaction/summary` appears nowhere in the file, so D-3 stands. `apply()` now
 clears the `(turn, step)` replacement slot on `llm/retry-started` and
-`tokenUsage.stateVersion` is 2, which closes D-4. The counter-check matters
-here: at `b150a551b8` that file is 219 lines with `stateVersion` 1 and no
-reference to `llm/retry`, so the change landed between 2026-08-26 and
-2026-08-27, not earlier.
+`tokenUsage.stateVersion` is 2, which closes D-4. The fix is
+`b565df344` ("feat(web): show exact per-turn token usage"), authored
+2026-08-25T19:05:52+08:00 and merged to the default branch four minutes later
+in `ad1156eb0`, then released in `dsh-v0.1.2-alpha.1` on 2026-08-28. Dating it
+by the tag reads two days late: `b150a551b8` is not an ancestor of the fix, so
+a check against rc.2 keeps reporting the defect after it is gone from master.
+`git merge-base --is-ancestor b565df344 <ref>` is the question that does not
+have that failure mode.
 
 Upstream took the retry half and left the compaction half. It keyed the
 attempt boundary on the `llm/retry-started` event rather than on an allowlist
