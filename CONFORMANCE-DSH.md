@@ -1,8 +1,9 @@
 # DeepSeek Harness session accounting — conformance invariants
 
-v0.3.0 · 2026-08-19 · companion to [`CONFORMANCE.md`](CONFORMANCE.md) (Claude Code) ·
+v0.4.0 · 2026-08-28 · companion to [`CONFORMANCE.md`](CONFORMANCE.md) (Claude Code) ·
 harness in [`dsh-probe/`](dsh-probe/) ·
 D-3 and D-4 filed upstream as [deepseek-harness#1886](https://github.com/deepseek-ai/deepseek-harness/discussions/1886)
+— **D-4 fixed upstream in `dsh-v0.1.2-alpha.1` (2026-08-27); D-3 open**
 
 If your plugin reads a DeepSeek Harness session log and reports tokens, cost,
 or usage totals, these are the invariants it has to hold.
@@ -135,6 +136,10 @@ does that for you on the file side.
 
 ## D-3 · Count what compaction costs — the official projection does not
 
+> **Open.** Re-checked 2026-08-28 at `cd5ef814` (`dsh-v0.1.2-alpha.1`):
+> `usageOf()` is unchanged and `compaction/summary` appears nowhere in the
+> file.
+
 Compaction summarizes older history by making a model call. That call's cost
 lands on `compaction/summary.usage`
 (`packages/compaction/compaction/src/types.ts`: "Provider-reported token
@@ -167,6 +172,16 @@ have to guess from adjacency.
 **Reported upstream:** [deepseek-harness#1886](https://github.com/deepseek-ai/deepseek-harness/discussions/1886).
 
 ## D-4 · A retried step carries more than two samples — never keep-first
+
+> **Fixed upstream 2026-08-27.** Present at `47f9438` (v0.1.0-rc.5) through
+> `b150a551b8` (0.1.1-rc.2); fixed in `cd5ef814` (`dsh-v0.1.2-alpha.1`), which
+> bumped `tokenUsage.stateVersion` 1→2 and made `llm/retry-started` close the
+> `(turn, step)` replacement slot so a retried attempt adds instead of
+> replacing. The entry stays: logs written before that tag still carry the
+> defect, and a consumer folding the log itself still has to get the attempt
+> boundary right. One consequence for D-5 — for logs written at
+> `0.1.2-alpha.1` or later the `Σ usage of superseded attempts` term should be
+> 0, and a non-zero value there is now itself a finding.
 
 A step is not one request. When a stream dies, the harness retries under the
 **same `(turn, step)`**, and each attempt can leave its own usage chunk. The
@@ -425,12 +440,35 @@ by the pre-fix binary landing on the cold post-fix figure.
 That fix landed **before** the DSH client shipped, so unlike D-1's analogue on
 the Claude side there is no inflated history to migrate.
 
-Upstream in DSH itself, D-1 through D-5 are unchanged: checked 2026-08-23
-against `b150a551b8` (`dsh-v0.1.1-rc.2`), `usage-projection.ts` still matches
-only `assistant/chunk` and `assistant/message`, and `stateVersion` is still 1.
-Four independent implementations of the fix exist and none can move, because
-CONTRIBUTING closes external PRs (line 9, read off the file: "we cannot accept
-external pull requests at the moment").
+Upstream in DSH itself, D-4 is fixed and D-3 is not. Re-checked 2026-08-28
+against `cd5ef814` (`dsh-v0.1.2-alpha.1`, published 2026-08-27): `usageOf()`
+still matches only `assistant/chunk` and `assistant/message`, and
+`compaction/summary` appears nowhere in the file, so D-3 stands. `apply()` now
+clears the `(turn, step)` replacement slot on `llm/retry-started` and
+`tokenUsage.stateVersion` is 2, which closes D-4. The counter-check matters
+here: at `b150a551b8` that file is 219 lines with `stateVersion` 1 and no
+reference to `llm/retry`, so the change landed between 2026-08-26 and
+2026-08-27, not earlier.
+
+Upstream took the retry half and left the compaction half. It keyed the
+attempt boundary on the `llm/retry-started` event rather than on an allowlist
+of failure kinds — `aborted` appears nowhere in the file — which sidesteps
+the objection raised against `63688b0` in the thread: an allowlist of two
+failure kinds silently reverts the moment an adapter adds a third.
+
+Five independent implementations of a fix now exist and none can move, because
+CONTRIBUTING closes external PRs (line 9, unchanged as of 2026-08-28: "we
+cannot accept external pull requests at the moment"). The fifth is
+[vpimshin](https://github.com/vpimshin/deepseek-harness/tree/fix/token-usage-compaction-and-retry)
+(`b4bbea2e`, based on `b150a551b8`, committed 2026-08-27T13:35Z), covering both
+halves plus two cases this catalog does not have: usage dropped on
+`compaction/end` when the default summarizer fails, and failed attempts that
+never write usage at all. Both are unverified here and are not entries yet.
+
+That branch and upstream both define `tokenUsage.stateVersion` 2 and do not
+mean the same thing — 250 lines against 225, failure-kind boundary against
+event boundary. Anything that trusts `stateVersion` to identify a persisted
+projection now has two incompatible 2s to tell apart.
 
 **The file is not, however, untouched since the baseline, and I said it was.**
 `4c421ec88 refactor(session-projection): separate state from client views` and
