@@ -100,6 +100,7 @@ read a corpus and print; there is nothing to pass or fail.
 | [`tokscale-drift-check/`](tokscale-drift-check/) | tokscale | I-7 | red/green, `--bin` |
 | [`viberank-143-per-agent/`](viberank-143-per-agent/) | viberank | I-10 | runs the maintainer's own merge fn at two commits |
 | [`tokscale-dsh-compaction-check/`](tokscale-dsh-compaction-check/) | tokscale DSH parser | D-3 | A/B across the fix, cold and warm cache |
+| [`tokscale-dsh-seq-key-check/`](tokscale-dsh-seq-key-check/) | tokscale DSH parser | cross-file identity of an idless row (I-3's analogue) | two constructed legs; `gate_published.sh` runs the shipped 4.15.0 → 4.15.1 packages cold and warm |
 | [`dsh-conformance/`](dsh-conformance/) | any DSH fold | D-1 .. D-5 | vendor-neutral, fixture-backed |
 | [`dsh-1886-crosscheck/`](dsh-1886-crosscheck/) | DSH upstream, two fork implementations, one ablation | D-3 | cross-checks independent implementations |
 | [`dsh-probe/`](dsh-probe/) | your DSH corpus | D-1 .. D-3 | measurement |
@@ -159,13 +160,15 @@ else's code, the regression tests other people wrote, and who reproduced a
 measurement independently. It opens by saying that nobody cites either catalog
 by name, which is true and is the honest place to start.
 
-As of 2026-08-25 it lists eleven upstream fixes across four projects
-(Clawdmeter, splitrail, tokscale, viberank), three regression tests written by
-other people, seven independent reproductions, and one conformance record: the
-first fold run through `dsh-conformance/` by somebody other than me. The count of fixes depends on
-how you split one Clawdmeter change that closed two invariants at once —
-`CONFORMANCE.md` counts it as one and says ten. Read the table rather than
-either total.
+As of 2026-09-05 it lists twelve upstream fixes across four projects
+(Clawdmeter, splitrail, tokscale, viberank), four regression tests written by
+other people, eight independent reproductions, two conformance records from
+folds I have never seen, and one release gate: a fixture the maintainer asked
+for by name, run on the package he shipped. The count of fixes depends on
+how you split one Clawdmeter change that closed two invariants at once, and
+on whether the two DSH-parser fixes are counted beside the Claude Code ones —
+`CONFORMANCE.md` covers Claude Code only, counts Clawdmeter as one, and says
+ten. Read the table rather than either total.
 
 Separately, one upstream thread now carries four independent implementations of
 the same fix, none of which can land, because the project does not accept

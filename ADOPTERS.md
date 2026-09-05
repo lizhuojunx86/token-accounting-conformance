@@ -33,6 +33,7 @@ holds it. The fix is theirs; the measurement was mine.
 | I-9 absence is not an observation | viberank | [#124](https://github.com/sculptdotfun/viberank/pull/124), server-side | 2026-08 |
 | I-10 a verdict must not outrun its evidence | viberank | [#143](https://github.com/sculptdotfun/viberank/pull/143) (`15da384`), contributions keyed per `(machine, agent)` via `ccusage --by-agent`; a split is kept only when it reconciles with the day it divides, and a Claude verdict now lowers Claude alone | 2026-08-22 |
 | D-3 count the compaction call | tokscale (DSH parser) | [#1162](https://github.com/junhoyeo/tokscale/pull/1162) (`d97a829`), `"assistant/message" \| "compaction/summary"` arm at `sessions/dsh.rs:153`, parser version 1→2. Fixed before the DSH client ever shipped | 2026-08-22 |
+| I-3's DSH analogue (no numbered entry): a row without `message.id` needs a key that is unique across files | tokscale (DSH parser) | [#1235](https://github.com/junhoyeo/tokscale/pull/1235) by IvGolovach (`030d667`): `cmp:{compactionId}` between `msg:` and `seq:`, `seq:` kept as the legacy fallback, parser identity 4→5 so rows already written under `seq:` are reparsed. Argued at [#1187](https://github.com/junhoyeo/tokscale/issues/1187); shipped in v4.15.1 on 2026-09-03 and gated on the published package (§4) | 2026-08-30 |
 
 ## 2 · Regression tests other people wrote
 
@@ -53,6 +54,13 @@ their tree fails on its own.
   per-month scope caught its own first implementation dropping 17 of 922
   files. The structure made a 2% undercount legible; that is the argument for
   the structure.
+
+- **tokscale [#1235](https://github.com/junhoyeo/tokscale/pull/1235)** — three
+  DSH tests by IvGolovach: `distinct_compaction_ids_keep_otherwise_identical_summaries`,
+  `summary_without_compaction_id_keeps_seq_fallback`,
+  `a_copied_summary_shares_its_key_across_a_fork_that_lost_seedlength`. The first is
+  leg A of `tokscale-dsh-seq-key-check/` and the third is leg B, in their tree rather
+  than mine. Merged 2026-08-30 (`030d667`), shipped in v4.15.1.
 
 ## 3 · Independent reproductions
 
@@ -113,6 +121,33 @@ both — it consumes no `llm/*` event either. Fixed in `e955166`; `expected.json
 byte-identical again, every fold and gap term unchanged.
 
 The second run is the first FAIL, and the first from Windows. It is the verdict working as designed: the residual decomposes into exactly the two dimensions the branch deliberately leaves out, and it read the same from outside the checkout as it had from inside it. His one wiring note (the fold command must run with its cwd inside the branch checkout, or the TS loader falls back to an unbuilt `lib/`) is in the README now (`f74b4a4`).
+
+### A release gate, by invitation
+
+Different from both rows above: my fixture, their binary, and the run was
+asked for. junhoyeo closed [#1187](https://github.com/junhoyeo/tokscale/issues/1187)
+on 2026-08-30 with "your fixture is the check I want to run against it";
+#1235 shipped in v4.15.1 on 2026-09-03; on 2026-09-05
+`tokscale-dsh-seq-key-check/gate_published.sh` ran the published
+`tokscale@4.15.0` and `tokscale@4.15.1` darwin-arm64 packages, cold and warm.
+
+| leg | input | output | cacheRead | cacheWrite | messages |
+|---|---|---|---|---|---|
+| 4.15.0, cold | 870 | 101 | 8,700 | 16 | 6 |
+| 4.15.1, warm on 4.15.0's cache | 1,177 | 132 | 11,770 | 23 | 7 |
+| 4.15.1, cold | 1,177 | 132 | 11,770 | 23 | 7 |
+
+4.15.0 lands on the `seq` column and drops one of leg A's two summarize calls,
+3,415 tokens. 4.15.1 lands on the `compactionId` column, and the first warm
+scan over the old cache lands there too, its shards byte-identical to a cold
+write. The real corpus is a no-op on every leg. Posted as
+[#1187 (comment)](https://github.com/junhoyeo/tokscale/issues/1187#issuecomment-5552012073);
+raw output in `tokscale-dsh-seq-key-check/results/published-*.json`.
+
+It is the first time the whole sequence ran: fixture posted before the fix,
+maintainer asks for it by name, fix ships, fixture graded on the shipped
+artifact rather than on a branch. One run, one project, and I ran it myself,
+so it is a record of the sequence and not of adoption.
 
 ---
 
