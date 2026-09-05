@@ -11,17 +11,28 @@ Reads DSH session transcripts and computes the same corpus four ways:
   O  official   replicates packages/llm/token-meter/src/usage-projection.ts
                 (tokenUsageProjectionDefinition) exactly
   S  seed-aware O, but skipping events inherited through a fork seed
-                (seq < header.seedLength)
+                (v0/v1: seq < header.seedLength. v2: seq < the seq of the last
+                 session/end-seed {inherited: true} marker)
   C  correct    S, plus compaction/summary.usage
 
 The gaps between them are the findings:
 
-  N - O   dual-write inflation   (usage rides both assistant/chunk and
-                                  assistant/message for the same turn/step)
+  N - O   dual-write inflation   (v0/v1: usage rides both assistant/chunk and
+                                  assistant/message for the same turn/step.
+                                  v2: the same two copies live INSIDE one
+                                  settlement, as `usage` and as the last usage
+                                  chunk of the embedded stream)
   O - S   fork-seed duplication  (a child session's log physically contains a
                                   copy of the parent's completed prefix)
   C - O   compaction undercount  (compaction/summary.usage is not folded by
                                   the official tokenUsage projection)
+
+Two session formats are read. v2 (f99b06ea, "feat(session)!: embed assistant
+streams in format v2") removed `assistant/chunk` from the event vocabulary and
+replaced the header's numeric `seedLength` with `isSeeded` plus a
+`session/end-seed {inherited: true}` marker whose own seq is the cut. Migrating
+the reference corpus took it from 8,650 events to 303 and left the number of
+places a usage number is written at 75, unchanged.
 
 Nothing here is inferred: each fold is a transcription of shipped source, cited
 inline. Run --self-test first; it builds a fixture with known ground truth and
@@ -175,30 +186,158 @@ def read_records(path: Path) -> list[dict]:
 # folds
 # --------------------------------------------------------------------------
 
-def usage_of(ev: dict) -> dict | None:
-    """usage-projection.ts :: usageOf -- what the OFFICIAL projection can see."""
-    t = ev.get("type")
-    if t == "assistant/chunk":
-        chunk = (ev.get("data") or {}).get("chunk") or {}
-        if chunk.get("type") == "usage":
-            return chunk.get("usage")
+def _last_stream_usage(stream) -> dict | None:
+    """Last usage chunk embedded in a v2 assistant stream.
+
+    usage-projection.ts (v2) walks `expandAssistantStream(...).toReversed()` and
+    returns the first usage chunk it meets, i.e. the last one in order.
+    """
+    if not isinstance(stream, list):
         return None
-    if t == "assistant/message":
-        return (ev.get("data") or {}).get("usage")
+    for member in reversed(stream):
+        chunk = member.get("chunk") if isinstance(member, dict) else None
+        if chunk is None and isinstance(member, dict):
+            chunk = member
+        if isinstance(chunk, dict) and chunk.get("type") == "usage":
+            return chunk.get("usage")
     return None
 
 
-def fold_official(events: list[dict]) -> dict[str, int]:
+def usage_of(ev: dict, fmt: int = 0) -> dict | None:
+    """usage-projection.ts :: usageOf -- what the OFFICIAL projection can see.
+
+    Two shapes, because the event model changed under it:
+
+    v0/v1  a usage stream chunk is its own top-level `assistant/chunk` event,
+           and the assembled `assistant/message` carries `usage` as well.
+    v2     one durable settlement per attempt (`assistant/message`, or
+           `assistant/attempt` when no surface message exists) with the stream
+           embedded. Landed in f99b06ea, "feat(session)!: embed assistant
+           streams in format v2"; `assistant/chunk` is gone from the vocabulary
+           (packages/core/session/src/known-event-types.ts).
+    """
+    t = ev.get("type")
+    if fmt < 2:
+        if t == "assistant/chunk":
+            chunk = (ev.get("data") or {}).get("chunk") or {}
+            if chunk.get("type") == "usage":
+                return chunk.get("usage")
+            return None
+        if t == "assistant/message":
+            return (ev.get("data") or {}).get("usage")
+        return None
+    if t == "assistant/message":
+        d = ev.get("data") or {}
+        if d.get("usage") is not None:
+            return d.get("usage")
+        return _last_stream_usage(d.get("stream"))
+    if t == "assistant/attempt":
+        return _last_stream_usage((ev.get("data") or {}).get("stream"))
+    return None
+
+
+def sightings_of(ev: dict, fmt: int = 0) -> list[dict]:
+    """Every distinct place this event writes a usage number.
+
+    This is the D-1 exhibit and it is NOT `usage_of`. Under v2 a single
+    `assistant/message` carries `usage` AND a stream whose last usage chunk
+    holds the same numbers, so the duplication that used to span two events now
+    sits inside one. A consumer that expands the stream (because that is where
+    the chunks used to live) and then also reads `.usage` doubles exactly as
+    before, with nothing in the log to suggest it.
+    """
+    out: list[dict] = []
+    if fmt < 2:
+        u = usage_of(ev, fmt)
+        if u is not None:
+            out.append(u)
+        return out
+    t = ev.get("type")
+    d = ev.get("data") or {}
+    if t == "assistant/message":
+        if d.get("usage") is not None:
+            out.append(d["usage"])
+        s = _last_stream_usage(d.get("stream"))
+        if s is not None:
+            out.append(s)
+    elif t == "assistant/attempt":
+        s = _last_stream_usage(d.get("stream"))
+        if s is not None:
+            out.append(s)
+    return out
+
+
+def count_intra_event_dual_write(events: list[dict], fmt: int) -> tuple[int, int]:
+    """(settlements carrying usage in two places, of which the two agree).
+
+    Only meaningful for v2. Under v0/v1 the two copies are separate events, so
+    this returns (0, 0) and the dual write shows up in N' / O instead.
+    """
+    if fmt < 2:
+        return (0, 0)
+    both = agree = 0
+    for ev in events:
+        if ev.get("type") != "assistant/message":
+            continue
+        d = ev.get("data") or {}
+        u, s = d.get("usage"), _last_stream_usage(d.get("stream"))
+        if u is None or s is None:
+            continue
+        both += 1
+        if buckets_from(u) == buckets_from(s):
+            agree += 1
+    return (both, agree)
+
+
+def inherited_cut(header: dict, events: list[dict], fmt: int) -> int:
+    """First seq of the session's own work; everything below it is the parent's.
+
+    v0/v1  header.seedLength, a numeric cut.
+    v2     header.isSeeded plus the seq of the LAST
+           `session/end-seed {inherited: true}` marker. The marker's own seq IS
+           the cut, so the marker is the first event of the child's own work --
+           do not add one. Upstream derives it exactly this way in
+           session-format-v1-to-v2/src/codec.ts deriveInheritedEventCount, and
+           validation.ts asserts `lastInheritedMarker === cut`.
+
+    A v2 header carrying `seedLength` is rejected outright by the current
+    Session package (packages/core/session/src/index.ts:98-100, "session header
+    has invalid field \\"seedLength\\""), so the old discriminator is not merely
+    absent, it is forbidden.
+    """
+    if fmt < 2:
+        return int(header.get("seedLength") or 0)
+    if not header.get("isSeeded"):
+        return 0
+    cut = 0
+    for ev in events:
+        if ev.get("type") == "session/end-seed" and (ev.get("data") or {}).get("inherited") is True:
+            cut = int(ev.get("seq", 0))
+    return cut
+
+
+def fold_official(events: list[dict], fmt: int = 0, retry_aware: bool = False) -> dict[str, int]:
     """Transcription of tokenUsageProjectionDefinition.apply.
 
     Single `last` slot; a repeated (turn, step) sample REPLACES the earlier
     value (addReplacing) instead of double counting. An identical repeat is a
     no-op via bucketsEqual.
+
+    retry_aware=False is stateVersion 1 (v0.1.0-rc.5, what the published
+    measurements were taken against). retry_aware=True is stateVersion 2, where
+    `llm/retry-started` clears the replacement slot so a retried attempt adds
+    instead of overwriting the attempt that died. Both are kept because the
+    difference is the whole of D-4 and it is zero on a corpus whose failed
+    attempts all reported zeros.
     """
     totals = zero()
     last: tuple[int, int, dict[str, int]] | None = None
     for ev in events:
-        u = usage_of(ev)
+        if ev.get("type") == "llm/retry-started":
+            if retry_aware:
+                last = None
+            continue
+        u = usage_of(ev, fmt)
         if u is None:
             continue
         d = ev.get("data") or {}
@@ -214,20 +353,25 @@ def fold_official(events: list[dict]) -> dict[str, int]:
     return totals
 
 
-def fold_naive(events: list[dict]) -> dict[str, int]:
+def fold_naive(events: list[dict], fmt: int = 0) -> dict[str, int]:
     """The obvious-and-wrong implementation: see a usage, add it.
 
     Includes compaction/summary.usage, because a naive walker has no reason to
     skip it -- which is why naive is not uniformly higher than correct.
+
+    Under v2 this sums both halves of the intra-event dual write, which is the
+    point: the migrated corpus goes from 8,650 events to 303 and the number of
+    places a usage number is written stays at 75.
     """
     totals = zero()
     for ev in events:
-        u = usage_of(ev)
-        if u is None and ev.get("type") == "compaction/summary":
+        seen = sightings_of(ev, fmt)
+        if not seen and ev.get("type") == "compaction/summary":
             u = (ev.get("data") or {}).get("usage")
-        if u is None:
-            continue
-        add(totals, buckets_from(u))
+            if u is not None:
+                seen = [u]
+        for u in seen:
+            add(totals, buckets_from(u))
     return totals
 
 
@@ -269,6 +413,9 @@ class SessionReport:
     seed_aware: dict[str, int]
     correct: dict[str, int]
     seq_contiguous: bool
+    format_version: int = 0
+    n_dual_write_sites: int = 0
+    n_dual_write_agree: int = 0
     notes: list[str] = field(default_factory=list)
 
 
@@ -283,8 +430,15 @@ def analyze_log(path: Path) -> SessionReport:
 
     events = [r for r in records[1:] if r.get("type") not in CHUNK_ROW_TAGS]
 
-    seed_length = int(header.get("seedLength") or 0)
+    fmt = int(header.get("version") or 0)
     notes: list[str] = []
+    if fmt > 2:
+        notes.append(
+            f"session format v{fmt} is newer than this probe understands (v2). "
+            "The folds below transcribe the v2 event model, so treat them as "
+            "unverified until the reader is updated."
+        )
+    seed_length = inherited_cut(header, events, fmt)
 
     seqs = [e.get("seq") for e in records[1:] if e.get("type") not in CHUNK_ROW_TAGS and "seq" in e]
     contiguous = all(b - a == 1 for a, b in zip(seqs, seqs[1:])) if len(seqs) > 1 else True
@@ -297,24 +451,37 @@ def analyze_log(path: Path) -> SessionReport:
 
     own = [e for e in events if int(e.get("seq", 0)) >= seed_length]
 
-    naive = fold_naive(events)
-    official = fold_official(events)
-    seed_aware = fold_official(own)
+    naive = fold_naive(events, fmt)
+    official = fold_official(events, fmt)
+    seed_aware = fold_official(own, fmt)
     correct = dict(seed_aware)
     add(correct, fold_compaction(own))
 
     n_sight = sum(
-        1
+        len(sightings_of(e, fmt))
+        or (1 if e.get("type") == "compaction/summary" and (e.get("data") or {}).get("usage") else 0)
         for e in events
-        if usage_of(e) is not None
-        or (e.get("type") == "compaction/summary" and (e.get("data") or {}).get("usage"))
     )
     n_compact = sum(1 for e in own if e.get("type") == "compaction/summary")
+    dual_both, dual_agree = count_intra_event_dual_write(events, fmt)
 
-    if seed_length and not any(e.get("type") == "session/end-seed" for e in events):
+    if fmt < 2 and seed_length and not any(e.get("type") == "session/end-seed" for e in events):
         notes.append(
             "header declares seedLength but no session/end-seed marker was found "
             "in the log -- a reader relying on the marker alone would mis-slice."
+        )
+    if fmt >= 2 and header.get("seedLength") is not None:
+        notes.append(
+            "v2 header carries seedLength, which the current Session package "
+            "rejects outright (packages/core/session/src/index.ts:98-100). This "
+            "log was not written by a conforming v2 writer."
+        )
+    if dual_both:
+        notes.append(
+            f"intra-event dual write: {dual_both} assistant/message event(s) carry "
+            f"usage in two places (the `usage` field and the embedded stream's last "
+            f"usage chunk); {dual_agree} of them hold identical numbers. Read one, "
+            "not both."
         )
 
     return SessionReport(
@@ -332,6 +499,9 @@ def analyze_log(path: Path) -> SessionReport:
         seed_aware=seed_aware,
         correct=correct,
         seq_contiguous=contiguous,
+        format_version=fmt,
+        n_dual_write_sites=dual_both,
+        n_dual_write_agree=dual_agree,
         notes=notes,
     )
 
@@ -421,10 +591,16 @@ def report(reports: list[SessionReport]) -> dict:
         else:
             kind = r.origin or "root"
         print(
-            f"  {r.session_id[:24]:<26}{kind:<10}depth={r.delegation_depth} "
+            f"  {r.session_id[:24]:<26}{kind:<10}v{r.format_version} "
+            f"depth={r.delegation_depth} "
             f"seed={r.seed_length:<6}events={r.n_events:<7}"
             f"usage={r.n_usage_sightings:<5}compact={r.n_compaction_summaries}"
         )
+        if r.n_dual_write_sites:
+            print(
+                f"      intra-event dual write: {r.n_dual_write_sites} settlement(s) "
+                f"carry usage twice, {r.n_dual_write_agree} identical"
+            )
         if total(r.official) != total(r.seed_aware):
             own = total(r.seed_aware)
             over = f"{total(r.official) / own:.2f}x" if own else "inf"
@@ -540,10 +716,89 @@ def build_fixture(dest: Path) -> dict:
     }
 
 
-def self_test() -> int:
-    tmp = Path(tempfile.mkdtemp(prefix="dsh-probe-fixture-"))
-    truth = build_fixture(tmp)
-    reports = [analyze_log(p) for p in discover(tmp)]
+def build_fixture_v2(dest: Path) -> dict:
+    """The same two sessions in the released-v2 event model.
+
+    Same ground truth as build_fixture, expressed the way a current DSH writes
+    it: one durable settlement per attempt with the stream embedded, no
+    top-level `assistant/chunk`, and the inherited cut carried by a
+    `session/end-seed {inherited: true}` marker instead of `seedLength`.
+
+    The dual write survives the change. Each `assistant/message` below holds the
+    same numbers in `usage` and in the last usage chunk of its stream, which is
+    what the v2 half of D-1 asserts.
+    """
+    def usage(i, o, cr=0, cw=0):
+        return {"inputTokens": i, "outputTokens": o, "cacheReadTokens": cr, "cacheWriteTokens": cw}
+
+    def ev(seq, type_, data):
+        return {"type": type_, "seq": seq, "time": 1_770_000_000_000 + seq, "data": data}
+
+    def settled(seq, turn, step, u):
+        # usage in BOTH places, exactly as the migration and the live writer emit it
+        return ev(seq, "assistant/message", {
+            "turn": turn, "step": step, "message": {}, "usage": u,
+            "stream": [{"chunk": {"type": "usage", "usage": u}}],
+        })
+
+    parent = [
+        {"type": "session", "version": 2, "id": "parent-2", "cwd": "/probe",
+         "createdAt": 1_770_000_000_000, "isSeeded": False, "delegationDepth": 0},
+        ev(0, "user/message", {"turn": 0}),
+        settled(1, 0, 0, usage(1000, 200, 50, 10)),
+        settled(2, 0, 1, usage(2000, 400, 0, 0)),
+        ev(3, "turn/end", {"turn": 0}),
+        ev(4, "compaction/start", {"compactionId": "c1", "turn": None}),
+        ev(5, "compaction/summary", {"compactionId": "c1", "summary": [],
+                                     "shadowedRange": {"start": 0, "end": 3},
+                                     "shadowedSeqs": [0, 1, 2, 3],
+                                     "shadowedTokenCount": 3660,
+                                     "provider": "deepseek", "model": "deepseek-v4",
+                                     "usage": usage(300, 150, 0, 0)}),
+        ev(6, "user/message", {"turn": 0, "surfaceOp": {"op": "replace", "start": 0, "end": 3}}),
+        ev(7, "compaction/end", {"compactionId": "c1", "turn": None}),
+    ]
+
+    # Child inherits seq 0..3. The marker sits AT the cut, so its own seq is the
+    # first event of the child's own work -- getting this off by one is the
+    # mistake the v2 rule invites.
+    seed = [dict(e) for e in parent[1:5]]
+    child = [
+        {"type": "session", "version": 2, "id": "child-2", "cwd": "/probe",
+         "createdAt": 1_770_000_000_100, "parentSession": "parent-2",
+         "isSeeded": True, "delegationDepth": 0, "agentPreset": "standard"},
+        *seed,
+        ev(4, "session/end-seed", {"inherited": True}),
+        settled(5, 1, 0, usage(500, 100, 0, 0)),
+        ev(6, "turn/end", {"turn": 1}),
+    ]
+
+    for name, log in (("parent-2", parent), ("child-2", child)):
+        d = dest / "--probe-v2--" / name
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "session.jsonl").write_text(
+            "\n".join(json.dumps(r, ensure_ascii=False) for r in log) + "\n", encoding="utf-8"
+        )
+
+    parent_real = (1000 + 200 + 50 + 10) + (2000 + 400)          # 3660
+    parent_compaction = 300 + 150                                 # 450
+    child_own = 500 + 100                                         # 600
+    return {
+        "correct": parent_real + parent_compaction + child_own,   # 4710
+        "seed_aware": parent_real + child_own,                    # 4260
+        "official": parent_real + child_own + parent_real,        # 7920
+        # naive: both halves of every intra-event dual write, plus compaction
+        "naive": (parent_real * 2 + parent_compaction)
+                 + (parent_real * 2 + child_own * 2),             # 16290
+        # 3 settlements in the parent's own log + 3 in the child (2 seeded + 1 own)
+        "dual_write_sites": 5,
+        "cut": 4,
+    }
+
+
+def _run_fixture(label: str, builder, dest: Path) -> tuple[bool, list[SessionReport], dict]:
+    truth = builder(dest)
+    reports = [analyze_log(p) for p in discover(dest)]
     agg = {k: zero() for k in ("naive", "official", "seed_aware", "correct")}
     for r in reports:
         add(agg["naive"], r.naive)
@@ -553,19 +808,48 @@ def self_test() -> int:
 
     ok = True
     print()
-    print("self-test -- folds vs hand-computed ground truth")
+    print(f"self-test [{label}] -- folds vs hand-computed ground truth")
     print("-" * 62)
     for k in ("naive", "official", "seed_aware", "correct"):
         got, want = total(agg[k]), truth[k]
         mark = "PASS" if got == want else "FAIL"
         ok &= got == want
         print(f"  {k:<14}{got:>10,}   expected {want:>10,}   {mark}")
+
+    # v2-only structural assertions: the dual write must still be visible, and
+    # the inherited cut must land on the marker's own seq rather than past it.
+    if "dual_write_sites" in truth:
+        got = sum(r.n_dual_write_sites for r in reports)
+        want = truth["dual_write_sites"]
+        mark = "PASS" if got == want else "FAIL"
+        ok &= got == want
+        print(f"  {'dual-write sites':<14}{got:>10,}   expected {want:>10,}   {mark}")
+        agree = sum(r.n_dual_write_agree for r in reports)
+        mark = "PASS" if agree == want else "FAIL"
+        ok &= agree == want
+        print(f"  {'  of which agree':<14}{agree:>10,}   expected {want:>10,}   {mark}")
+    if "cut" in truth:
+        seeded = [r for r in reports if r.seed_length]
+        got = seeded[0].seed_length if seeded else -1
+        want = truth["cut"]
+        mark = "PASS" if got == want else "FAIL"
+        ok &= got == want
+        print(f"  {'inherited cut':<14}{got:>10,}   expected {want:>10,}   {mark}")
+
     print()
-    print(f"  fixture at {tmp}")
+    print(f"  fixture at {dest}")
+    return ok, reports, truth
+
+
+def self_test() -> int:
+    tmp = Path(tempfile.mkdtemp(prefix="dsh-probe-fixture-"))
+    ok_v1, _, _ = _run_fixture("v0/v1", build_fixture, tmp / "v1")
+    ok_v2, _, _ = _run_fixture("v2", build_fixture_v2, tmp / "v2")
+    ok = ok_v1 and ok_v2
     print()
     if ok:
-        print("  All folds reproduce the constructed truth. The probe may now be")
-        print("  pointed at a real corpus.")
+        print("  All folds reproduce the constructed truth in both event models.")
+        print("  The probe may now be pointed at a real corpus.")
     else:
         print("  A fold disagrees with the fixture. Fix the probe before running it")
         print("  on real data -- do not publish anything measured with it.")

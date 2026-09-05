@@ -1,13 +1,49 @@
 # DeepSeek Harness session accounting — conformance invariants
 
-v0.4.0 · 2026-08-28 · companion to [`CONFORMANCE.md`](CONFORMANCE.md) (Claude Code) ·
+v0.5.0 · 2026-09-05 · companion to [`CONFORMANCE.md`](CONFORMANCE.md) (Claude Code) ·
 harness in [`dsh-probe/`](dsh-probe/) ·
 D-3 and D-4 filed upstream as [deepseek-harness#1886](https://github.com/deepseek-ai/deepseek-harness/discussions/1886)
 — **D-4 fixed upstream in `b565df344` (2026-08-25), released in
-`dsh-v0.1.2-alpha.1`; D-3 open**
+`dsh-v0.1.2-alpha.1`; D-3 open at `d347e703` (`0.1.3-alpha.1`)**
 
 If your plugin reads a DeepSeek Harness session log and reports tokens, cost,
 or usage totals, these are the invariants it has to hold.
+
+## Read this first: which session format you are holding
+
+Session format v2 landed on 2026-09-01 in `f99b06ea`, "feat(session)!: embed
+assistant streams in format v2", and it changes how three of these entries are
+worded without changing what any of them measure. The header's `version` tells
+you which model you are reading.
+
+| | v0 / v1 | v2 |
+|---|---|---|
+| a usage stream chunk | its own `assistant/chunk` event | embedded in the settlement's `stream` |
+| durable settlement | `assistant/message` | `assistant/message`, or `assistant/attempt` when no surface message exists |
+| inherited cut | `header.seedLength` | `header.isSeeded` + the seq of the last `session/end-seed {inherited: true}` |
+| `assistant/chunk` | present | removed from the event vocabulary |
+
+`assistant/chunk` is gone rather than deprecated: it is absent from
+`packages/core/session/src/known-event-types.ts` and filtered out of the frozen
+v2 inventory in `session-format-v1-to-v2/src/dispositions.ts`. A v2 header
+carrying `seedLength` is rejected outright by the current Session package
+(`packages/core/session/src/index.ts:98-100`, "session header has invalid field
+`seedLength`").
+
+**Reading old logs.** The frozen released-v0 reader in the current tree refuses
+logs written by `0.1.0-rc.6`: `assistant/chunk 179 chunk replayState has
+unexpected member "kind"`. `replayState` was `{kind, version, api, provider,
+model, responseId, stopReason, blocks}` in August and the frozen disposition
+allows `{response, blocks?}`. It is an optional member of a finish chunk and
+carries no usage, so dropping it lets an old corpus through the migration; the
+folds are bucket-for-bucket identical before and after. State this before
+quoting any cross-version recomputation.
+
+**What migrating the reference corpus showed.** Converted v0 → v1 → v2 with
+upstream's own migration packages at `d347e703`, the four sessions go from
+**8,650 events to 303**, and the number of places a usage number is written
+stays at **75**. Every fold in this catalog returns the same total in both
+formats. The event model changed; none of the hazards did.
 
 The Claude Code catalog exists because shipped trackers violated its entries.
 This one starts earlier: DSH is nine days old at v0.1.0-rc.5, and the
@@ -50,10 +86,27 @@ as together; where a figure differs between them, both are given.
 
 ## D-1 · Fold usage per `(turn, step)` — every sample is written twice
 
-One model call reports its usage twice. Once as a stream chunk
-(`assistant/chunk` whose `chunk.type === 'usage'`), once on the assembled
-message (`assistant/message.usage`). Both carry the same `TokenUsage`. A
-walker that adds every usage it sees doubles the whole corpus.
+One model call reports its usage twice. Both copies carry the same
+`TokenUsage`, and a walker that adds every usage it sees doubles the whole
+corpus. Where the second copy sits depends on the format, and the v2 placement
+is the harder one to notice.
+
+**v0 / v1 — two events.** Once as a stream chunk (`assistant/chunk` whose
+`chunk.type === 'usage'`), once on the assembled message
+(`assistant/message.usage`).
+
+**v2 — two fields inside one event.** `live.settle()` writes exactly one
+durable settlement per attempt (`agent.ts:389, 407, 413, 430, 460`, mutually
+exclusive branches), and that settlement carries `usage` *and* a `stream` whose
+last usage chunk holds the same numbers. Expanding the stream because that is
+where the chunks used to live, and then also reading `.usage`, reproduces the
+old doubling with nothing in the log to suggest it happened. On the migrated
+reference corpus, **36 of 36** `assistant/message` events carry usage in both
+places and all 36 agree exactly.
+
+**The rule, in one line:** read `usage` or the stream, never both. The official
+`usageOf()` reads `.usage` first and falls back to the stream only when it is
+absent.
 
 `TokenUsage` counts are disjoint (`packages/llm/llm/src/types.ts:135`:
 "Counts are DISJOINT: inputTokens is uncached input only"), so the four
@@ -82,12 +135,27 @@ that sample instead of double-counting it."
 **Check:** fold naive and fold per `(turn, step)` over the same log. The
 ratio is the answer. Anything near 2 means the dedup is missing.
 
-## D-2 · Discriminate an inherited prefix on `seedLength`, never on `origin`
+## D-2 · Discriminate an inherited prefix on the seed cut, never on `origin`
 
 A forked child's log physically contains a copy of the parent's completed
-prefix. The child's header carries `seedLength`; every event with
-`seq < seedLength` is the parent's work, sitting in the child's file. Summing
-sessions across a root double-counts that prefix.
+prefix. Every event below the seed cut is the parent's work, sitting in the
+child's file. Summing sessions across a root double-counts that prefix.
+
+**Where the cut is depends on the format, and this is the entry v2 broke.**
+
+- **v0 / v1** — `header.seedLength`, a numeric cut. Every event with
+  `seq < seedLength` is inherited.
+- **v2** — the header has no numeric cut. It carries `isSeeded`, and the cut is
+  the **seq of the last `session/end-seed {inherited: true}` marker**
+  (`session-format-v1-to-v2/src/codec.ts:125-136`, asserted as
+  `lastInheritedMarker === cut` in `validation.ts:88-127`). The marker's own seq
+  *is* the cut, so the marker is the first event of the child's own work. Do not
+  add one. The totals will not catch that mistake, because the marker carries no
+  usage.
+
+Earlier revisions of this entry said `seedLength` was the only sound
+discriminator. On a v2 log the field is not merely absent, it is forbidden
+(`packages/core/session/src/index.ts:98-100`).
 
 The trap is which field you filter on. A **subagent** child is stamped
 `origin: 'subagent'` (`packages/subagent/subagent/src/child-agent.ts:115`)
@@ -109,10 +177,13 @@ every ordinary fork.
 
 **Measured, twice, and the two numbers are the finding:**
 
-| fork | inherited | own work | folded whole | overstatement |
-|---|---|---|---|---|
-| `session-e61d64ec` | 1,008 of parent's 1,012 events | 2,204 | 11,418 | **5.18×** |
-| `session-e7c289bf` | 3,171 of parent's 3,171 events | 11,442 | 263,790 | **23.05×** |
+| fork | inherited (v0) | inherited (v2) | own work | folded whole | overstatement |
+|---|---|---|---|---|---|
+| `session-e61d64ec` | 1,008 of parent's 1,012 events | 47 of 65 | 2,204 | 11,418 | **5.18×** |
+| `session-e7c289bf` | 3,171 of parent's 3,171 events | 83 of 104 | 11,442 | 263,790 | **23.05×** |
+
+The event counts collapse under v2 and the ratios do not move. Only the field
+you check changed.
 
 The error is not a factor, it is a ratio of inherited work to own work, and
 nothing bounds it. Fork a long session, ask one question, and the child
@@ -125,6 +196,16 @@ reports the whole parent. Both headers carry `delegationDepth: 0` and no
  "delegationDepth":0,"agentPreset":"standard"}
 ```
 
+The same fork after migration to v2. `seedLength` is gone, `isSeeded` replaces
+it, and the shape of the trap is otherwise untouched — still `delegationDepth:
+0`, still no `origin`:
+
+```json
+{"type":"session","version":2,"id":"session-e61d64ec-…","createdAt":1786781215584,
+ "cwd":"/Users/lizhuojun/dsh-probe","parentSession":"session-001e8887-…",
+ "isSeeded":true,"delegationDepth":0,"agentPreset":"standard"}
+```
+
 Official telemetry handles it by the right key: the OTel coordinator emits
 `session.parent_id` and `session.seed_length` and expects receivers to
 "stitch on (parent_id, seed_length)"
@@ -132,14 +213,17 @@ Official telemetry handles it by the right key: the OTel coordinator emits
 does that for you on the file side.
 
 **Check:** fold a child twice, once over all events and once over
-`seq >= header.seedLength`. If the two agree on a session whose header has a
-`seedLength`, the filter is not running.
+`seq >= cut`, where `cut` is `header.seedLength` on v0/v1 and the last
+inherited `session/end-seed` seq on v2. If the two agree on a session that
+declares a seed, the filter is not running.
 
 ## D-3 · Count what compaction costs — the official projection does not
 
-> **Open.** Re-checked 2026-08-28 at `cd5ef814` (`dsh-v0.1.2-alpha.1`):
-> `usageOf()` is unchanged and `compaction/summary` appears nowhere in the
-> file.
+> **Open.** Re-checked 2026-09-05 at `d347e703` (`0.1.3-alpha.1`): the file is
+> 221 lines, `compaction/summary` appears zero times, and `usageOf()` handles
+> `assistant/message` and `assistant/attempt` and nothing else. Present at
+> `47f9438` (v0.1.0-rc.5), still present after the v2 rewrite of the
+> surrounding event model.
 
 Compaction summarizes older history by making a model call. That call's cost
 lands on `compaction/summary.usage`
@@ -148,8 +232,10 @@ usage for the summarization request, when emitted"; written at
 `packages/compaction/compaction-basic/src/region.ts:447`).
 
 The official `tokenUsage` projection cannot see it. Its `usageOf()` matches
-`assistant/chunk` and `assistant/message` and nothing else
-(`usage-projection.ts:116-123`), and the summarize call is not a loop step,
+`assistant/chunk` and `assistant/message` and nothing else on v0/v1
+(`usage-projection.ts:116-123` at `cd5ef814`), and `assistant/message` and
+`assistant/attempt` and nothing else on v2 (`usage-projection.ts:82-89` at
+`d347e703`). Either way the summarize call is not a loop step,
 so it produces neither. Every plugin built on that projection inherits the
 gap, including the ones doing the correct thing and reading
 `sessionProjections.tokenUsage` rather than folding the log themselves.
@@ -200,6 +286,19 @@ seq 3279  assistant/chunk  usage   {"inputTokens":32,"outputTokens":1042,"cacheR
 seq 3281  assistant/message usage  {"inputTokens":32,"outputTokens":1042,"cacheReadTokens":10368}
 ```
 
+That is the v0/v1 shape. Under v2 the dead attempt becomes one
+`assistant/attempt` carrying its stream, the retry pair stays where it is, and
+the survivor becomes one `assistant/message` — two settlements under one
+`(turn, step)`, which is exactly why the replacement slot and the
+`llm/retry-started` boundary are both still load-bearing after the rewrite:
+
+```
+seq …  assistant/attempt          stream ends {"inputTokens":0,"outputTokens":0}
+seq …  llm/retry                  retryId=afabacf1 provider=minimax-cn
+seq …  llm/retry-started          retry=1
+seq …  assistant/message  usage   {"inputTokens":32,"outputTokens":1042,"cacheReadTokens":10368}
+```
+
 Three usage samples under one `(turn, step)`, and nothing bounds the count:
 one more retry is one more sample.
 
@@ -240,7 +339,15 @@ D-1 writes every sample twice and D-4 adds a third under a retried step, so a
 raw sum of usage sightings lands near 2× the projection on any session at all,
 compaction or no compaction. The left side has to be a corrected fold: collapse
 per `(turn, step)`, treat a failed terminal chunk as an attempt boundary, skip
-the inherited prefix on `seedLength`.
+the inherited prefix at the seed cut.
+
+**Take the usage by settlement, not by event type.** On v0/v1 that means a
+usage `assistant/chunk` or `assistant/message.usage`; on v2 it means one value
+per `assistant/message` or `assistant/attempt`, read from `usage` when present
+and otherwise from the last usage chunk of the embedded `stream`. A left side
+still written against `assistant/chunk` returns zero on a v2 log, and zero
+against a non-zero projection reads as a catastrophic failure rather than as a
+reader that is looking for an event type the format no longer has.
 
 The residual between that fold and the official projection is then not zero,
 and it is not one number either. Three things separate them, each computable
@@ -443,10 +550,12 @@ by the pre-fix binary landing on the cold post-fix figure.
 That fix landed **before** the DSH client shipped, so unlike D-1's analogue on
 the Claude side there is no inflated history to migrate.
 
-Upstream in DSH itself, D-4 is fixed and D-3 is not. Re-checked 2026-08-28
-against `cd5ef814` (`dsh-v0.1.2-alpha.1`, published 2026-08-27): `usageOf()`
-still matches only `assistant/chunk` and `assistant/message`, and
-`compaction/summary` appears nowhere in the file, so D-3 stands. `apply()` now
+Upstream in DSH itself, D-4 is fixed and D-3 is not. Re-checked 2026-09-05
+against `d347e703` (`0.1.3-alpha.1`): the file is 221 lines, `usageOf()`
+matches `assistant/message` and `assistant/attempt` and nothing else, and
+`compaction/summary` appears nowhere in it, so D-3 stands through the v2
+rewrite. (At `cd5ef814`, the previous re-check on 2026-08-28, the same two
+facts held with `assistant/chunk` in place of `assistant/attempt`.) `apply()` now
 clears the `(turn, step)` replacement slot on `llm/retry-started` and
 `tokenUsage.stateVersion` is 2, which closes D-4. The fix is
 `b565df344` ("feat(web): show exact per-turn token usage"), authored
