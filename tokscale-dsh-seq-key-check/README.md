@@ -110,3 +110,42 @@ the double count #1173 fixes does not occur in this corpus at all.
 `proposed.patch.py` to a tokscale checkout at `/tmp/ts1162`, builds
 `tokscale-cli` in release, drops the binary in `/tmp/ab1173/tokscale-cmp` and
 restores the tree with `git checkout --`. Edit the two paths if yours differ.
+
+## Measured on the published packages (2026-09-05)
+
+#1235 shipped in tokscale v4.15.1 (npm, 2026-09-03). `gate_published.sh`
+runs the two published darwin-arm64 binaries, not a build:
+
+| | npm package | binary sha256 (first 16) |
+|---|---|---|
+| old | `tokscale@4.15.0`, parser identity 4 | `46df00d30977abba` |
+| new | `tokscale@4.15.1`, parser identity 5 | `2576f434faf96ff8` |
+
+Four legs per root. A: old, cold `HOME`. B: new, warm on A's `HOME` — the
+cache 4.15.0 wrote, read by a binary one identity ahead. C: new, cold. D: new
+again on C's `HOME`.
+
+| leg | input | output | cacheRead | cacheWrite | messages |
+|---|---|---|---|---|---|
+| fixture A, 4.15.0 cold | 870 | 101 | 8,700 | 16 | 6 |
+| fixture B, 4.15.1 warm after A | 1,177 | 132 | 11,770 | 23 | 7 |
+| fixture C, 4.15.1 cold | 1,177 | 132 | 11,770 | 23 | 7 |
+| fixture D, 4.15.1 warm after C | 1,177 | 132 | 11,770 | 23 | 7 |
+| corpus A / B / C / D | 66,094 | 8,281 | 249,728 | 0 | 22 |
+
+4.15.0 lands on the `seq` column, dropping one of leg A's two summarize calls
+(3,415 tokens). 4.15.1 lands on the `compactionId` column cold, and the first
+warm scan over 4.15.0's cache lands on the same figure with `messageCount`
+moving 6 → 7 — the identity bump reparsed the seq-keyed rows rather than
+serving them. After leg B the four `dsh/shard-*.bin` files under A's `HOME`
+are byte-identical to the ones a cold 4.15.1 writes, fixture and corpus alike.
+The real corpus is a no-op across all four legs, as predicted above. Raw
+output in `results/published-*.json`.
+
+```sh
+npm install --no-save tokscale@4.15.0   # in one scratch dir
+npm install --no-save tokscale@4.15.1   # in another
+./gate_published.sh <old>/node_modules/@tokscale/cli-darwin-arm64/bin/tokscale \
+                    <new>/node_modules/@tokscale/cli-darwin-arm64/bin/tokscale \
+                    [/path/to/DSH_HOME]
+```
