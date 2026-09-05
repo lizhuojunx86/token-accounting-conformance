@@ -5,7 +5,8 @@ Both legs turn on the same question: what identifies a `compaction/summary`,
 which carries no `data.message.id`.
 
   leg A  two UNRELATED sessions whose summaries agree on seq, time, routing and
-         every usage bucket, and differ only in `data.compactionId`.
+         every usage bucket, and differ only in their per-call ids,
+         `data.compactionId` and `data.sourceCommandId`.
          Under the `seq:` fallback (tokscale#1173) the two keys are identical
          and the cross-file pass drops one billed call.
 

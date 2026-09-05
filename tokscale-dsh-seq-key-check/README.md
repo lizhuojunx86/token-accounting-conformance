@@ -38,7 +38,8 @@ totals by arithmetic before writing anything.
 
 **Leg A** — two unrelated sessions, no `parentSession`, no `seedLength`, whose
 summaries agree on `seq`, `time`, provider, model and every usage bucket, and
-differ only in `compactionId`. Two separately billed summarize calls.
+differ only in the two per-call ids, `compactionId` and `sourceCommandId`. Two
+separately billed summarize calls.
 
 **Leg B** — a parent and a fork whose header lost `seedLength`, the child's
 prefix repeating the parent's summary verbatim. One billed call. This is the
