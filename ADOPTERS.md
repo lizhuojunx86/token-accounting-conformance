@@ -61,6 +61,16 @@ their tree fails on its own.
   `a_copied_summary_shares_its_key_across_a_fork_that_lost_seedlength`. The first is
   leg A of `tokscale-dsh-seq-key-check/` and the third is leg B, in their tree rather
   than mine. Merged 2026-08-30 (`030d667`), shipped in v4.15.1.
+- **tokscale [#1282](https://github.com/junhoyeo/tokscale/pull/1282)** — the
+  `DSH Cache Migration` gate. I opened it with the `dsh-seq-key` fixture and a
+  four-leg script; junhoyeo found that its baseline, `tokscale@latest`, already
+  carried the parser version under test, so the migration never ran and
+  reverting the bump stayed green. His four commits on top (`5d3fb60c`,
+  `47850958`, `410b2b80`, `f47f48ac`) pin 4.14.0 and 4.15.0 as predecessors,
+  plant a canary transcript whose in-place edit is visible only if a shard was
+  reparsed, add a `dsh-served-model` fixture whose totals are identical on both
+  sides of the attribution change, and a 21-case self-test for the gate's own
+  red paths. Merged 2026-09-06 (`cf2197a6`), +1,713 lines, none of mine removed.
 
 ## 3 · Independent reproductions
 
@@ -149,6 +159,31 @@ maintainer asks for it by name, fix ships, fixture graded on the shipped
 artifact rather than on a branch. One run, one project, and I ran it myself,
 so it is a record of the sequence and not of adoption.
 
+### In their CI
+
+The step after the row above. On 2026-09-05 I opened
+[#1282](https://github.com/junhoyeo/tokscale/pull/1282) against tokscale: the
+`dsh-seq-key` fixture copied into their tree at
+`crates/tokscale-core/tests/fixtures/dsh-seq-key/`, a script that reads the
+last release's cache with the current build, and a workflow path-filtered to
+the DSH parser and the cache. junhoyeo requested changes on 2026-09-06 with a
+defect I had not seen: the workflow seeded its baseline from `tokscale@latest`,
+which was already at the parser version under test, so the v4→v5 migration
+never ran — "even reverting HEAD's parser version to 4 would pass this gate."
+My dry run had pinned 4.15.0 by hand; the file I committed had not. He then
+rewrote the gate himself rather than send it back (§2), and merged it the same
+day (`cf2197a6`).
+
+`dsh_cache_migration.yml` has run on every push to `main` since, and on one
+third-party pull request, green each time. It is the first time anything from
+this repository runs in a tree I do not own. Two limits on what that means: it
+is the fixture and a gate around it, not the catalog: nothing in the workflow
+cites `CONFORMANCE-DSH.md`, and the invariant it holds is held by
+`expected.json`, not by name; and the gate as merged is mostly his. He also
+recorded its remaining blind spot in the approval: a cache-format bump with no
+legacy wire branch, shipped in the same PR as a silent DSH parse change, would
+pass the `latest` legs. That is written here as not covered, not as a pass.
+
 ---
 
 ## 5 · Offered and not taken up
@@ -158,8 +193,11 @@ Kept here so the page isn't only wins.
 - **`ci/tokscale.yml`** — the drift harness as a drop-in workflow, offered at
   [tokscale#1011](https://github.com/junhoyeo/tokscale/issues/1011) and
   [Clawdmeter#21](https://github.com/weltern/Clawdmeter/issues/21). Not wired
-  into any repo yet. The DSH checker has now been run by someone else
-  (§4), but no project runs any of this in its own CI.
+  into any repo, and that stays the honest reading of this bullet: the offer
+  was the drift harness as a drop-in file, and nobody took it. What did land
+  is a different gate (§4, *In their CI*): a fixture plus a cache-migration
+  check, opened as a pull request rather than offered as a file, and largely
+  rewritten by the maintainer before it merged.
 - **I-1 in claude-code-templates** —
   [#754](https://github.com/davila7/claude-code-templates/pull/754), open,
   checks green, no maintainer response. The last unshipped fix.

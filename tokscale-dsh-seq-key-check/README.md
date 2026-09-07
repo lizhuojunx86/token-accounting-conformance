@@ -150,3 +150,22 @@ npm install --no-save tokscale@4.15.1   # in another
                     <new>/node_modules/@tokscale/cli-darwin-arm64/bin/tokscale \
                     [/path/to/DSH_HOME]
 ```
+
+## Upstream (2026-09-06)
+
+The fixture is in tokscale's tree now, byte for byte, at
+`crates/tokscale-core/tests/fixtures/dsh-seq-key/`, and their
+`DSH Cache Migration` workflow (`.github/workflows/dsh_cache_migration.yml`)
+runs it on every push that touches `sessions/dsh.rs`, `message_cache.rs`, the
+fixture or the script — [#1282](https://github.com/junhoyeo/tokscale/pull/1282),
+merged as `cf2197a6`.
+
+What merged is not the four-leg script above. My version seeded the
+predecessor cache from `tokscale@latest`, which already carried parser
+identity 5, so the migration it claimed to test never ran; the dry run in the
+previous section had pinned 4.15.0 by hand, and the workflow had not.
+junhoyeo's rewrite pins 4.14.0 (identity 3) and 4.15.0 (identity 4) as
+predecessors, keeps `latest` as a compatibility leg, plants a canary
+transcript to tell a served shard from a reparsed one, and grades a second
+fixture, `dsh-served-model`, on its per-model split. `gate_published.sh` here
+stays the outside check: same fixture, published packages, no build.
