@@ -1,10 +1,11 @@
 # DeepSeek Harness session accounting — conformance invariants
 
-v0.5.0 · 2026-09-05 · companion to [`CONFORMANCE.md`](CONFORMANCE.md) (Claude Code) ·
+v0.5.1 · 2026-09-12 · companion to [`CONFORMANCE.md`](CONFORMANCE.md) (Claude Code) ·
 harness in [`dsh-probe/`](dsh-probe/) ·
 D-3 and D-4 filed upstream as [deepseek-harness#1886](https://github.com/deepseek-ai/deepseek-harness/discussions/1886)
 — **D-4 fixed upstream in `b565df344` (2026-08-25), released in
-`dsh-v0.1.2-alpha.1`; D-3 open at `d347e703` (`0.1.3-alpha.1`)**
+`dsh-v0.1.2-alpha.1`; D-3 open at `a3053034` (`dsh-v0.1.5-rc.2`, session format v3;
+re-measured with the shipped projection in [`dsh-probe/v3-migration/`](dsh-probe/v3-migration/))**
 
 If your plugin reads a DeepSeek Harness session log and reports tokens, cost,
 or usage totals, these are the invariants it has to hold.
@@ -30,14 +31,25 @@ carrying `seedLength` is rejected outright by the current Session package
 (`packages/core/session/src/index.ts:98-100`, "session header has invalid field
 `seedLength`").
 
-**Reading old logs.** The frozen released-v0 reader in the current tree refuses
-logs written by `0.1.0-rc.6`: `assistant/chunk 179 chunk replayState has
-unexpected member "kind"`. `replayState` was `{kind, version, api, provider,
-model, responseId, stopReason, blocks}` in August and the frozen disposition
-allows `{response, blocks?}`. It is an optional member of a finish chunk and
-carries no usage, so dropping it lets an old corpus through the migration; the
-folds are bucket-for-bucket identical before and after. State this before
-quoting any cross-version recomputation.
+**Reading old logs.** Between `f99b06ea` and `46196d6f95` (2026-09-01 to
+2026-09-06, i.e. `0.1.2-alpha.5` through `0.1.3-alpha.1`) the frozen released-v0
+reader refused logs written by `0.1.0-rc.6`: `assistant/chunk 179 chunk
+replayState has unexpected member "kind"`. `replayState` was `{kind, version,
+api, provider, model, responseId, stopReason, blocks}` in August and the
+disposition allows `{response, blocks?}`. Since `46196d6f95` ("perf(session-format):
+stream released v0-to-v2 migrations", in `dsh-v0.1.3-alpha.2` and later) the v0
+stage skips payload validation for `assistant/chunk`, and the raw rc.6 corpus
+restores under both validation modes with folds identical to the stripped run.
+`strip-replaystate.mjs` is kept for the two tags that need it.
+
+**Session format v3.** A current DSH writes v3 (`session-format-catalog`
+`currentEncoder: releasedV3SessionFormatCodec` since `f7a6221158`, 2026-09-06;
+shipped from `dsh-v0.1.5-alpha.1`). V3 promotes the system head into two
+`system/message` events per session and remaps references; the usage shape of
+`assistant/message`, `assistant/attempt` and `compaction/summary` is unchanged,
+and every fold below returns the same total on v0, v2 and v3
+([`dsh-probe/v3-migration/`](dsh-probe/v3-migration/)). A reader that gates on
+`header.version <= 2` sees nothing from a current host.
 
 **What migrating the reference corpus showed.** Converted v0 → v1 → v2 with
 upstream's own migration packages at `d347e703`, the four sessions go from
@@ -219,11 +231,14 @@ declares a seed, the filter is not running.
 
 ## D-3 · Count what compaction costs — the official projection does not
 
-> **Open.** Re-checked 2026-09-05 at `d347e703` (`0.1.3-alpha.1`): the file is
-> 221 lines, `compaction/summary` appears zero times, and `usageOf()` handles
-> `assistant/message` and `assistant/attempt` and nothing else. Present at
-> `47f9438` (v0.1.0-rc.5), still present after the v2 rewrite of the
-> surrounding event model.
+> **Open.** Re-checked 2026-09-12 at `a3053034` (`dsh-v0.1.5-rc.2`) and master
+> `c291e796` (2026-09-10): `usageOf()` still handles `assistant/message` and
+> `assistant/attempt` and nothing else; `compaction/summary` is read only by
+> `surface-projection.ts`, for the shadow price. Re-measured by restoring the
+> corpus v0 → v3 through `sessionFormatCatalog.createRestore` and folding with
+> `tokenUsageProjectionDefinition.apply` itself: 48,895 tokens over 3 events,
+> unchanged. Present at `47f9438` (v0.1.0-rc.5), still present after the v2
+> and v3 rewrites of the surrounding event model.
 
 Compaction summarizes older history by making a model call. That call's cost
 lands on `compaction/summary.usage`
