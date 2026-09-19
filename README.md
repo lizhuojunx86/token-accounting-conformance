@@ -96,6 +96,7 @@ read a corpus and print; there is nothing to pass or fail.
 |---|---|---|---|
 | [`cct-dedup-check/`](cct-dedup-check/) | claude-code-templates | I-1 | red on upstream main |
 | [`clawdmeter-dedup/`](clawdmeter-dedup/) | Clawdmeter | I-1 | red on v3.0.0, green on v3.0.1 |
+| [`tare-check/`](tare-check/) | tare | I-3, I-11, `--days` scoping of tool events | red on `03159f2`; green with the bundled patch |
 | [`tokscale-input-estimate-check/`](tokscale-input-estimate-check/) | tokscale | I-6 | A/B, needs real transcripts |
 | [`tokscale-drift-check/`](tokscale-drift-check/) | tokscale | I-7 | red/green, `--bin` |
 | [`viberank-143-per-agent/`](viberank-143-per-agent/) | viberank | I-10 | runs the maintainer's own merge fn at two commits |
@@ -109,8 +110,8 @@ read a corpus and print; there is nothing to pass or fail.
 
 I-4 has no harness here; the self-contained repro shipped upstream in
 [splitrail #220](https://github.com/Piebald-AI/splitrail/issues/220). I-11 is
-asserted as a property of a tool's machine-readable output rather than by a
-script. D-4's magnitude is fixture-only — `dsh-probe` does not measure it,
+asserted as a property of a tool's machine-readable output; `tare-check/`
+case C is the first script for it. D-4's magnitude is fixture-only — `dsh-probe` does not measure it,
 because no corpus here contains a failed attempt that reported real tokens.
 
 ## The badge

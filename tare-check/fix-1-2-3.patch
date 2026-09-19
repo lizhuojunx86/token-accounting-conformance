@@ -1,0 +1,109 @@
+diff --git a/skills/tare/ccaudit.py b/skills/tare/ccaudit.py
+index 3fbbb53..9327434 100755
+--- a/skills/tare/ccaudit.py
++++ b/skills/tare/ccaudit.py
+@@ -135,11 +135,16 @@ def est_tokens(obj):
+ 
+ # --- Parsing ---------------------------------------------------------------
+ 
+-def parse_session(fp, project, since, stats):
+-    """Walk one transcript in order. Returns (requests, tool_events)."""
++def parse_session(fp, project, since, stats, seen=None):
++    """Walk one transcript in order. Returns (requests, tool_events).
++
++    `seen` maps request key -> request dict. Pass one dict across every file so
++    a session resumed into a second transcript (records replayed verbatim,
++    same requestId / message.id) is counted once account-wide."""
+     requests, tool_events = [], []
+     tool_names = {}       # tool_use_id -> (label, detail)
+-    seen = {}             # request key -> index into requests
++    if seen is None:
++        seen = {}
+ 
+     try:
+         fh = open(fp, "r", encoding="utf-8", errors="replace")
+@@ -175,6 +180,8 @@ def parse_session(fp, project, since, stats):
+             for b in blocks:
+                 if b.get("type") != "tool_result":
+                     continue
++                if since and ts and ts < since:
++                    continue
+                 label, detail = tool_names.get(
+                     b.get("tool_use_id"), ("unknown tool", None))
+                 tokens = est_tokens(b.get("content"))
+@@ -202,15 +209,15 @@ def parse_session(fp, project, since, stats):
+ 
+             key = e.get("requestId") or msg.get("id") or f"{fp.stem}:{lineno}"
+             if key in seen:
+-                # same API response, another content block: don't double count
+-                prev = requests[seen[key]]
++                # same API response, another content block or a resume replay:
++                # don't double count
++                prev = seen[key]
+                 prev["_dupes"] += 1
+                 if counts["output_tokens"] > prev["output_tokens"]:
+                     prev.update(counts)
+                 stats["dupes"] += 1
+                 continue
+ 
+-            seen[key] = len(requests)
+             requests.append({
+                 "file": str(fp), "project": project,
+                 "session": e.get("sessionId") or fp.stem, "ts": ts,
+@@ -220,6 +227,7 @@ def parse_session(fp, project, since, stats):
+                 "stop_reason": msg.get("stop_reason"),
+                 "cost_usd": e.get("costUSD"), "_dupes": 1, **counts,
+             })
++            seen[key] = requests[-1]
+             stats["records"] += 1
+ 
+     # content injected at request i is re-sent on every later request
+@@ -232,6 +240,7 @@ def parse_session(fp, project, since, stats):
+ def load_all(root, since, verbose=False):
+     stats = Counter()
+     requests, tools = [], []
++    seen = {}             # request key -> request dict, account-wide
+     for fp in sorted(root.rglob("*.jsonl")):
+         try:
+             mtime = dt.datetime.fromtimestamp(fp.stat().st_mtime, dt.timezone.utc)
+@@ -246,7 +255,7 @@ def load_all(root, since, verbose=False):
+             project = rel.parts[0] if len(rel.parts) > 1 else "(root)"
+         except ValueError:
+             project = fp.parent.name
+-        r, t = parse_session(fp, project, since, stats)
++        r, t = parse_session(fp, project, since, stats, seen)
+         requests.extend(r)
+         tools.extend(t)
+     requests.sort(key=lambda x: x["ts"] or dt.datetime.min.replace(
+@@ -258,12 +267,18 @@ def load_all(root, since, verbose=False):
+ 
+ # --- Metrics ---------------------------------------------------------------
+ 
++UNPRICED_PLACEHOLDER = MODEL_RATES["opus"]
++
++
+ def rate_for(model):
+     m = model.lower()
+     for k in sorted(MODEL_RATES, key=len, reverse=True):
+         if k in m:
+             return MODEL_RATES[k]
+-    return None
++    # A family MODEL_RATES has never heard of. Weigh it like the estimated
++    # families rather than 0.0: a silent zero drops it out of every share,
++    # the panel's top-3 and the rolling window (see rate_is_estimated).
++    return UNPRICED_PLACEHOLDER
+ 
+ 
+ def family(model):
+@@ -272,8 +287,9 @@ def family(model):
+ 
+ 
+ def rate_is_estimated(model):
+-    """True when this model's rate is a placeholder rather than a real price."""
+-    return family(model) in ESTIMATED_FAMILIES
++    """True when this model's rate is a placeholder rather than a real price:
++    an ESTIMATED_FAMILIES entry, or a family MODEL_RATES does not list at all."""
++    return family(model) in ESTIMATED_FAMILIES or family(model) == "other"
+ 
+ 
+ def model_label(model):

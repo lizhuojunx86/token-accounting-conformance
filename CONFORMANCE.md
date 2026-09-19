@@ -202,19 +202,21 @@ script instead of a red/green check.
 | `viberank-83/corpus_scope.py` | your corpus | I-5, I-8 | measures flat-vs-recursive counts and period-boundary double-counting |
 | `viberank-83/corpus_absence_scope.py` | your corpus | I-9 | measures how much of your submission history has aged off disk |
 | splitrail I-4 | splitrail | I-4 | fixture + repro shipped upstream in [#220](https://github.com/Piebald-AI/splitrail/issues/220) → #222; the issue body carries a self-contained repro script |
+| `tare-check/` | tare | I-3, I-11 (+ `--days` scoping of tool events) | `./check_tare.py` — red on `03159f2`; green with the bundled 36-line patch |
 
 `traceguard`'s own `routing_audit` store is the substrate these were measured
 against: append-only, `message.id`-keyed, Apache-2.0. `pip install traceguard`.
 
 ## Status
 
-| tracker | stars (Aug 2026) | violations found | fixed in |
+| tracker | stars (when measured) | violations found | fixed in |
 |---|---|---|---|
 | splitrail | 216 | I-4, I-5 (+ an earlier dedup fix) | #208, #209, #222 |
 | tokscale | 4.6k | I-6, I-7 | v4.9.0, v4.11.0 |
 | Clawdmeter | — | I-1 (I-2, I-3 established in the fix exchange) | v3.0.1 |
 | viberank | — | I-7, I-8, I-9, I-10 | #111, #121, #124, #143 (CLI v1.9.0) |
 | claude-code-templates | 30.1k | I-1 | PR #754 open |
+| tare (kelviq) | 11 → 279 (Sep 4 → Sep 18) | I-3, I-11, tool events not scoped to `--days` (I-2/I-4 pass) | [#8](https://github.com/kelviq/tare/issues/8) open, no response; no commit on the repo since 2026-08-28 |
 
 Where these invariants are now enforced by someone else's code, who
 reproduced a measurement independently, and what has been offered and not

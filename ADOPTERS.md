@@ -201,6 +201,23 @@ Kept here so the page isn't only wins.
 - **I-1 in claude-code-templates** —
   [#754](https://github.com/davila7/claude-code-templates/pull/754), open,
   checks green, no maintainer response. The last unshipped fix.
+- **kelviq/tare #8** — three findings and one pass against `03159f2`,
+  fixture inlined, a PR for the two cheap ones offered, filed 2026-09-04
+  ([#8](https://github.com/kelviq/tare/issues/8)). Fourteen days later:
+  no reply, no reaction, no commit. That is not a verdict on the report:
+  the last commit is 2026-08-28, the maintainer's last action on the
+  repository is a bot review he triggered on PR #3 on 2026-08-30, and
+  the outside PRs since (#5 and #6 on Sep 1, one of them Windows fixes
+  measured on 620 real transcripts; #11 on Sep 14) have no response
+  either; #4 was closed by its own author for inactivity. What did move
+  in the same fourteen days is the star count, 11 to 279, and 13 forks. So a
+  skill a few hundred people now run carries an unpriced-model zero,
+  tool attribution that ignores `--days`, and per-file dedup, with nobody
+  at the other end. The measurement is in
+  [`tare-check/`](tare-check/) so it outlives the issue, and the 36-line
+  patch that turns it green sits next to it, unopened as a PR: a fix
+  nobody rules on does not keep, and this section already has two of
+  those.
 - **D-1..D-5 upstream** — half moved, at last. `b565df344` (2026-08-25,
   released in `dsh-v0.1.2-alpha.1` / `cd5ef814`) lands the retry half: `apply()` clears the replacement slot on
   `llm/retry-started` and `tokenUsage.stateVersion` goes 1 → 2. The compaction
