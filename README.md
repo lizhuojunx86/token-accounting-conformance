@@ -101,7 +101,7 @@ read a corpus and print; there is nothing to pass or fail.
 | [`tokscale-drift-check/`](tokscale-drift-check/) | tokscale | I-7 | red/green, `--bin` |
 | [`viberank-143-per-agent/`](viberank-143-per-agent/) | viberank | I-10 | runs the maintainer's own merge fn at two commits |
 | [`tokscale-dsh-compaction-check/`](tokscale-dsh-compaction-check/) | tokscale DSH parser | D-3 | A/B across the fix, cold and warm cache |
-| [`tokscale-dsh-seq-key-check/`](tokscale-dsh-seq-key-check/) | tokscale DSH parser | cross-file identity of an idless row (I-3's analogue) | two constructed legs; `gate_published.sh` runs the shipped 4.15.0 → 4.15.1 packages cold and warm. The fixture is vendored upstream at `crates/tokscale-core/tests/fixtures/dsh-seq-key/` and run by tokscale's own `DSH Cache Migration` workflow since [#1282](https://github.com/junhoyeo/tokscale/pull/1282) |
+| [`tokscale-dsh-seq-key-check/`](tokscale-dsh-seq-key-check/) | tokscale DSH parser | cross-file identity of an idless row (I-3's analogue) | two constructed legs; `gate_published.sh` runs the shipped 4.15.0 → 4.15.1 packages cold and warm. The fixture is vendored upstream at `crates/tokscale-core/tests/fixtures/dsh-seq-key/` and graded by tokscale's own Rust tests since [#1324](https://github.com/junhoyeo/tokscale/pull/1324) (a CI workflow from [#1282](https://github.com/junhoyeo/tokscale/pull/1282) until then) |
 | [`dsh-conformance/`](dsh-conformance/) | any DSH fold | D-1 .. D-5 | vendor-neutral, fixture-backed |
 | [`dsh-1886-crosscheck/`](dsh-1886-crosscheck/) | DSH upstream, two fork implementations, one ablation | D-3 | cross-checks independent implementations |
 | [`dsh-probe/`](dsh-probe/) | your DSH corpus | D-1 .. D-3 | measurement |
@@ -161,15 +161,16 @@ else's code, the regression tests other people wrote, and who reproduced a
 measurement independently. It opens by saying that nobody cites either catalog
 by name, which is true and is the honest place to start.
 
-As of 2026-09-07 it lists twelve upstream fixes across four projects
-(Clawdmeter, splitrail, tokscale, viberank), five regression tests written by
+As of 2026-10-22 it lists twelve upstream fixes across four projects
+(Clawdmeter, splitrail, tokscale, viberank), six regression tests written by
 other people, eight independent reproductions, two conformance records from
 folds I have never seen, one release gate (a fixture the maintainer asked
-for by name, run on the package he shipped) and, since 2026-09-06, one gate
-running in a repository I do not own: tokscale's `DSH Cache Migration`
-workflow carries the `dsh-seq-key` fixture in their tree and runs it on every
-push that touches the DSH parser or the cache
-([#1282](https://github.com/junhoyeo/tokscale/pull/1282)). The count of fixes depends on
+for by name, run on the package he shipped) and one gate inside a repository
+I do not own: tokscale carries the `dsh-seq-key` fixture in their tree and
+grades it in their own Rust test suite
+([#1282](https://github.com/junhoyeo/tokscale/pull/1282), moved into the suite by
+[#1324](https://github.com/junhoyeo/tokscale/pull/1324), with a mixed-shard case added in
+[#1356](https://github.com/junhoyeo/tokscale/pull/1356)). The count of fixes depends on
 how you split one Clawdmeter change that closed two invariants at once, and
 on whether the two DSH-parser fixes are counted beside the Claude Code ones —
 `CONFORMANCE.md` covers Claude Code only, counts Clawdmeter as one, and says
@@ -194,12 +195,14 @@ fixture on the first attempt. Everything else here has only ever been run by me,
 and every harness was written after I had already measured the defect and
 reported it, so how often the suite catches something nobody was looking for is
 still unknown. None of the `ci/` workflows is wired into a target repository.
-One gate is, since 2026-09-06: tokscale's `dsh_cache_migration.yml`, with this
-repository's `dsh-seq-key` fixture in their tree
-([#1282](https://github.com/junhoyeo/tokscale/pull/1282)). It went in after the maintainer
-replaced my `latest` baseline, which had made the migration under test
-unreachable, with pinned releases; the gate that runs is mostly his, and it
-holds one invariant by fixture rather than the catalog by name.
+One gate sits in a target's own tests: tokscale's, with this repository's
+`dsh-seq-key` fixture in their tree. It went in as a workflow
+([#1282](https://github.com/junhoyeo/tokscale/pull/1282)) after the maintainer replaced my
+`latest` baseline, which had made the migration under test unreachable, with
+pinned releases. He later moved it into Rust tests
+([#1324](https://github.com/junhoyeo/tokscale/pull/1324)), which dropped the comparison
+against a published binary. The gate that runs is mostly his, and it holds one
+invariant by fixture rather than the catalog by name.
 
 ## Where this came from
 

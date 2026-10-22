@@ -71,6 +71,16 @@ their tree fails on its own.
   reparsed, add a `dsh-served-model` fixture whose totals are identical on both
   sides of the attribution change, and a 21-case self-test for the gate's own
   red paths. Merged 2026-09-06 (`cf2197a6`), +1,713 lines, none of mine removed.
+- **tokscale [#1324](https://github.com/junhoyeo/tokscale/pull/1324)** — junhoyeo moved the #1282
+  gate into `crates/tokscale-core/src/message_cache.rs` and deleted the
+  workflow and both scripts. His reason: the last `main` run took about 8m26s,
+  7m41s of it a release build, for about 14s of comparisons, and the path
+  filter charged that build to unrelated cache work. Each gate leg maps to a
+  named test, and the two existing cache tests now run the production scan and
+  assert on what it persisted. He also wrote down what the move gives up: the
+  `latest` legs were the only comparison against a published binary, and
+  `expected.json` carries it offline only while nobody rewrites `current` to
+  match changed behaviour. Merged 2026-09-12, shipped in v4.16.0.
 
 ## 3 · Independent reproductions
 
@@ -174,15 +184,41 @@ My dry run had pinned 4.15.0 by hand; the file I committed had not. He then
 rewrote the gate himself rather than send it back (§2), and merged it the same
 day (`cf2197a6`).
 
-`dsh_cache_migration.yml` has run on every push to `main` since, and on one
-third-party pull request, green each time. It is the first time anything from
-this repository runs in a tree I do not own. Two limits on what that means: it
+`dsh_cache_migration.yml` ran on every push to `main` from then until
+2026-09-12, and on one third-party pull request, green each time. It was the
+first time anything from this repository ran in a tree I do not own. Two limits on what that means: it
 is the fixture and a gate around it, not the catalog: nothing in the workflow
 cites `CONFORMANCE-DSH.md`, and the invariant it holds is held by
 `expected.json`, not by name; and the gate as merged is mostly his. He also
 recorded its remaining blind spot in the approval: a cache-format bump with no
 legacy wire branch, shipped in the same PR as a silent DSH parse change, would
 pass the `latest` legs. That is written here as not covered, not as a pass.
+
+### In their test suite
+
+The workflow lasted six days. On 2026-09-12 junhoyeo replaced it with Rust
+tests in `message_cache.rs` ([#1324](https://github.com/junhoyeo/tokscale/pull/1324), §2) and deleted the
+workflow file and both scripts. The fixture stayed in their tree, and the gate
+now runs with the rest of `tokscale-core`'s tests instead of as a separate job.
+The v4.16.0 release notes list #1282 and #1324 together.
+
+The same day he opened [#1325](https://github.com/junhoyeo/tokscale/issues/1325) against his own port: every
+assertion compared aggregate totals, so a scan that served one stale shard
+while the others were current would still pass. I wrote the test for it,
+[#1356](https://github.com/junhoyeo/tokscale/pull/1356): one cache holding a `dsh-seq-key` shard seeded at
+parser version 4 next to a current shard, each graded on its own outcome. Five
+assertions. The stale shard is absent from the report, reparsed to the
+recorded `current` figures, and rewritten to the running identity on disk;
+the current shard is served and left where it was. Seeding the stale side at
+the running version makes it stop at `the stale shard was served rather than
+reparsed`. He reviewed it at the exact head and merged it on 2026-09-23; it
+shipped in v4.18.0 on 2026-10-05.
+
+The limits above still hold, and one got wider. The test holds an invariant by
+fixture, not the catalog by name, and the comparison against a published
+binary is gone: `expected.json` is now the only baseline, which his PR says in
+so many words. What changed is where it lives. A workflow can be dropped in a
+commit that touches nothing else. These tests sit in the module they check.
 
 ---
 
