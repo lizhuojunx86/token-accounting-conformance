@@ -90,6 +90,7 @@ Three traps that cost time, recorded so they don't cost yours:
 | `ARTICLE-DRAFT.md` | write-up |
 | `v2-migration/` | the same corpus under session format v2 (`0.1.3-alpha.1`), via upstream's migration packages |
 | `v3-migration/` | the same corpus under session format v3 (`dsh-v0.1.5-rc.2`), restored through the shipped catalog and folded with the shipped projection |
+| `v4-migration/` | the same corpus under session format v4 (`dsh-v0.2.1-alpha.2`, re-run at `dsh-v0.2.2-rc.3`), same method; every fold matches v3 |
 
 Session logs are **not** committed: a real DSH transcript contains whatever
 you talked about. `.gitignore` excludes them. Publish measurements, not

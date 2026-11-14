@@ -432,11 +432,19 @@ def analyze_log(path: Path) -> SessionReport:
 
     fmt = int(header.get("version") or 0)
     notes: list[str] = []
-    if fmt > 2:
+    if fmt > 4:
         notes.append(
-            f"session format v{fmt} is newer than this probe understands (v2). "
+            f"session format v{fmt} is newer than this probe understands (v4). "
             "The folds below transcribe the v2 event model, so treat them as "
             "unverified until the reader is updated."
+        )
+    elif fmt > 2:
+        notes.append(
+            f"session format v{fmt} is newer than this probe's v2 reader. "
+            "v3 and v4 keep the v2 usage shape (re-measured in "
+            "dsh-probe/v3-migration and dsh-probe/v4-migration), so the folds "
+            "below are expected to hold; treat them as unverified on a corpus "
+            "that departs from that shape."
         )
     seed_length = inherited_cut(header, events, fmt)
 

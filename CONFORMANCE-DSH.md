@@ -1,11 +1,13 @@
 # DeepSeek Harness session accounting — conformance invariants
 
-v0.5.1 · 2026-09-12 · companion to [`CONFORMANCE.md`](CONFORMANCE.md) (Claude Code) ·
+v0.5.2 · 2026-11-14 · companion to [`CONFORMANCE.md`](CONFORMANCE.md) (Claude Code) ·
 harness in [`dsh-probe/`](dsh-probe/) ·
 D-3 and D-4 filed upstream as [deepseek-harness#1886](https://github.com/deepseek-ai/deepseek-harness/discussions/1886)
 — **D-4 fixed upstream in `b565df344` (2026-08-25), released in
-`dsh-v0.1.2-alpha.1`; D-3 open at `a3053034` (`dsh-v0.1.5-rc.2`, session format v3;
-re-measured with the shipped projection in [`dsh-probe/v3-migration/`](dsh-probe/v3-migration/))**
+`dsh-v0.1.2-alpha.1`; D-3 open at `38a6a5c9` (`dsh-v0.2.2-rc.3`, session format v4;
+re-measured with the shipped projection in [`dsh-probe/v4-migration/`](dsh-probe/v4-migration/)
+at `dsh-v0.2.1-alpha.2` and again at `dsh-v0.2.2-rc.3`,
+previously at `a3053034` / v3 in [`dsh-probe/v3-migration/`](dsh-probe/v3-migration/))**
 
 If your plugin reads a DeepSeek Harness session log and reports tokens, cost,
 or usage totals, these are the invariants it has to hold.
@@ -50,6 +52,22 @@ shipped from `dsh-v0.1.5-alpha.1`). V3 promotes the system head into two
 and every fold below returns the same total on v0, v2 and v3
 ([`dsh-probe/v3-migration/`](dsh-probe/v3-migration/)). A reader that gates on
 `header.version <= 2` sees nothing from a current host.
+
+**Session format v4.** A current DSH writes v4 (`session-format-catalog`
+`currentVersion: 4`, `currentEncoder: releasedV4SessionFormatCodec` in
+`session-format-catalog/src/generated.ts:17,25`; shipped from `dsh-v0.2.1-alpha.2`,
+unchanged at `dsh-v0.2.2-rc.3`).
+V4 remaps message sources and tool-result roles and appends historical child
+catalog facts; the usage shape is again unchanged, and every fold below returns
+the same total on v0, v2, v3 and v4
+([`dsh-probe/v4-migration/`](dsh-probe/v4-migration/)). One restore caveat: the
+bare `sessionFormatCatalog.createRestore` now throws on a v3-or-older log unless
+the parent declares its historical children —
+`SessionFormatUnsupportedMigrationError` at
+`session-format-v3-to-v4/src/migration.ts:23-24`; use
+`createSessionFormatCatalogWithChildren(facts)` (empty array for a childless
+parent), the same entry point persistence uses. A reader that gates on
+`header.version <= 3` sees nothing from a current host.
 
 **What migrating the reference corpus showed.** Converted v0 → v1 → v2 with
 upstream's own migration packages at `d347e703`, the four sessions go from
@@ -231,20 +249,25 @@ declares a seed, the filter is not running.
 
 ## D-3 · Count what compaction costs — the official projection does not
 
-> **Open.** Re-checked 2026-09-12 at `a3053034` (`dsh-v0.1.5-rc.2`) and master
-> `c291e796` (2026-09-10): `usageOf()` still handles `assistant/message` and
-> `assistant/attempt` and nothing else; `compaction/summary` is read only by
-> `surface-projection.ts`, for the shadow price. Re-measured by restoring the
-> corpus v0 → v3 through `sessionFormatCatalog.createRestore` and folding with
-> `tokenUsageProjectionDefinition.apply` itself: 48,895 tokens over 3 events,
-> unchanged. Present at `47f9438` (v0.1.0-rc.5), still present after the v2
-> and v3 rewrites of the surrounding event model.
+> **Open.** Re-checked 2026-11-14 at `38a6a5c9` (`dsh-v0.2.2-rc.3`, session
+> format v4): `usageOf()` still handles `assistant/message` and
+> `assistant/attempt` and nothing else (`usage-projection.ts:82-86`);
+> `tokenUsageProjectionDefinition.stateVersion` is still 2 (`:113`); `apply()`
+> still has no `compaction/summary` branch (`:116-125`); `compaction/summary`
+> still writes `usage` at `compaction-basic/src/region.ts:504`. Re-measured by
+> restoring the corpus v0 → v4 through `createSessionFormatCatalogWithChildren([])`
+> and folding with `tokenUsageProjectionDefinition.apply` itself: 48,895 tokens
+> over 3 events, unchanged, as it was at `d7432673` (`dsh-v0.2.1-alpha.2`,
+> 2026-10-12). Previously re-checked 2026-09-12 at `a3053034`
+> (`dsh-v0.1.5-rc.2`) and master `c291e796` (2026-09-10). Present at `47f9438`
+> (v0.1.0-rc.5), still present after the v2, v3 and v4 rewrites of the
+> surrounding event model.
 
 Compaction summarizes older history by making a model call. That call's cost
 lands on `compaction/summary.usage`
 (`packages/compaction/compaction/src/types.ts`: "Provider-reported token
 usage for the summarization request, when emitted"; written at
-`packages/compaction/compaction-basic/src/region.ts:447`).
+`packages/compaction/compaction-basic/src/region.ts:504`).
 
 The official `tokenUsage` projection cannot see it. Its `usageOf()` matches
 `assistant/chunk` and `assistant/message` and nothing else on v0/v1
